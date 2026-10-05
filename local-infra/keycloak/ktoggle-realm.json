@@ -1,7 +1,16 @@
 {
-  "realm": "mobilt",
+  "realm": "ktoggle",
+  "displayName": "ktoggle",
   "enabled": true,
   "sslRequired": "none",
+  "loginTheme": "ktoggle",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "pt-BR",
+    "en"
+  ],
+  "defaultLocale": "pt-BR",
+  "rememberMe": true,
   "roles": {
     "realm": [
       {

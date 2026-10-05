@@ -23,7 +23,7 @@ are phase 2**, so GrowthBook cannot be switched off before that (mono-fe uses ex
 ```bash
 ./mvnw clean verify            # unit (*Test) + integration (*IT, embedded PostgreSQL via zonky, no Docker) + JaCoCo
 ./mvnw test -Dtest=GrowthBookSdkContractTest
-docker compose up -d           # Postgres 16, Redis 7, Keycloak 26 (realm mobilt, see local-infra/keycloak)
+docker compose up -d           # Postgres 16, Redis 7, Keycloak 26 (realm ktoggle, see local-infra/keycloak)
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # http://localhost:8090/swagger-ui.html
 ```
 
@@ -79,7 +79,7 @@ zout, persistence/AWS types stay in zout (and config), domain has no web depende
 - Errors: throw `KtoggleException` subclasses with a `MessageCode`; `CoreExceptionHandler` renders `ErrorResponse`.
 - Updates carry the `version` they were based on (optimistic locking → 409 `CONCURRENT_MODIFICATION`).
 - Optional `X-Ktoggle-Reason` header on mutations (required for bundle rollback) is stored in audit and revisions.
-- Roles (Keycloak realm `mobilt`): `ktoggle-viewer` < `ktoggle-editor` < `ktoggle-admin` (see `SecurityConfiguration`).
+- Roles (Keycloak realm `ktoggle`): `ktoggle-viewer` < `ktoggle-editor` < `ktoggle-admin` (see `SecurityConfiguration`).
 - Tests: `*Test` unit (no Spring), `*IT` with `@IntegrationTest` (shared context — avoid `@MockBean`/`@DirtiesContext`).
   Call scheduled methods directly (scheduling is disabled in the `test` profile).
 - Commits: Conventional Commits with the Jira key, e.g. `feat(KIB-1234): ...`. Branches `dev`/`stg`/`prd`.

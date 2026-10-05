@@ -40,7 +40,8 @@ services:
     ports:
       - "8180:8180"
     volumes:
-      - ./local-infra/keycloak/mobilt-realm.json:/opt/keycloak/data/import/mobilt-realm.json:ro
+      - ./local-infra/keycloak/ktoggle-realm.json:/opt/keycloak/data/import/ktoggle-realm.json:ro
+      - ./local-infra/keycloak/themes/ktoggle:/opt/keycloak/themes/ktoggle:ro
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 5s
@@ -64,8 +65,8 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
       # Issuer as seen by the browser; signing keys fetched over the compose network.
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8180/realms/mobilt
-      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/mobilt/protocol/openid-connect/certs
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8180/realms/ktoggle
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/ktoggle/protocol/openid-connect/certs
     ports:
       - "8090:8090"
     healthcheck:

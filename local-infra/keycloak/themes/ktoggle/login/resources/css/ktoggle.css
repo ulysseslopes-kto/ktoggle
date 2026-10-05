@@ -1,0 +1,162 @@
+/* ktoggle login — same identity as ktoggle-ui: black backdrop, KTO red, white text, Inter + Archivo 900 italic. */
+@font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url('../fonts/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url('../fonts/inter-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 700; font-display: swap; src: url('../fonts/inter-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Archivo'; font-weight: 900; font-style: italic; font-display: swap; src: url('../fonts/archivo-latin-900-italic.woff2') format('woff2'); }
+
+:root {
+  --red: #da0000;
+  --red-hover: #f01414;
+  --green: #00dd70;
+  --ink: #000;
+  --surface: #1e1e1e;
+  --surface-2: #323232;
+  --surface-3: #3c3c3c;
+  --muted: #9b9b9b;
+  --soft: #d9d9d9;
+  --grey: #505050;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  background: var(--ink);
+  color: #fff;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--red); color: #fff; }
+
+.kt-red { color: var(--red); }
+
+.kt-shell { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); min-height: 100%; }
+
+/* ---- Brand panel ------------------------------------------------------------------------------ */
+.kt-brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 48px 56px;
+  border-right: 1px solid var(--surface-2);
+  background:
+    radial-gradient(1200px 600px at -10% 110%, rgba(218, 0, 0, 0.35), transparent 60%),
+    linear-gradient(135deg, #0a0a0a 0%, #000 60%);
+  overflow: hidden;
+}
+
+.kt-brand::after {
+  content: '';
+  position: absolute;
+  right: -120px;
+  top: 18%;
+  width: 360px;
+  height: 160px;
+  border-radius: 999px;
+  border: 2px solid rgba(218, 0, 0, 0.35);
+}
+
+.kt-logo { display: flex; align-items: center; gap: 12px; }
+.kt-switch { display: inline-flex; justify-content: flex-end; width: 44px; height: 24px; padding: 3px; border-radius: 999px; background: var(--red); }
+.kt-switch > span { width: 18px; height: 18px; border-radius: 999px; background: #fff; }
+.kt-wordmark, .kt-headline {
+  font-family: 'NN Swinton', 'Archivo', 'Inter', sans-serif;
+  font-weight: 900;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+}
+.kt-wordmark { font-size: 34px; line-height: 1; }
+
+.kt-pitch { position: relative; z-index: 1; }
+.kt-headline { margin: 0 0 28px; font-size: clamp(40px, 5vw, 64px); line-height: 0.95; }
+.kt-pitch ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.kt-pitch li { position: relative; padding-left: 22px; color: var(--soft); font-size: 15px; }
+.kt-pitch li::before { content: ''; position: absolute; left: 0; top: 7px; width: 10px; height: 10px; border-radius: 2px; background: var(--red); }
+
+.kt-foot { margin: 0; color: var(--grey); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* ---- Form panel ------------------------------------------------------------------------------- */
+.kt-panel { display: flex; align-items: center; justify-content: center; padding: 32px 24px; }
+.kt-card { width: 100%; max-width: 400px; }
+.kt-logo-compact { display: none; margin-bottom: 32px; }
+.kt-logo-compact .kt-wordmark { font-size: 28px; }
+
+.kt-title { margin: 0 0 6px; font-size: 26px; font-weight: 700; }
+.kt-title + .kt-form, .kt-title + .kt-alert { margin-top: 28px; }
+
+.kt-attempted { display: flex; justify-content: space-between; align-items: center; margin: 0 0 20px; padding: 10px 14px; border: 1px solid var(--surface-3); border-radius: 8px; background: var(--surface); font-size: 14px; }
+
+.kt-form { display: grid; gap: 18px; }
+.kt-group { display: grid; gap: 8px; }
+.kt-label { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); }
+
+.kt-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--surface-3);
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.kt-input:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 1px var(--red); }
+.kt-input[aria-invalid='true'] { border-color: var(--red); }
+
+.kt-password { position: relative; }
+.kt-password .kt-input { padding-right: 84px; }
+.kt-reveal { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 6px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.kt-reveal:hover { background: var(--surface-2); color: #fff; }
+
+.kt-field-error { color: var(--red); font-size: 13px; }
+
+.kt-options { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+.kt-check { display: inline-flex; align-items: center; gap: 8px; color: var(--soft); cursor: pointer; }
+.kt-check input { width: 16px; height: 16px; accent-color: var(--red); }
+.kt-link, .kt-card a { color: var(--soft); font-size: 14px; text-decoration: none; }
+.kt-link:hover, .kt-card a:hover { color: var(--red); }
+
+.kt-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.kt-button-primary { background: var(--red); color: #fff; }
+.kt-button-primary:hover { background: var(--red-hover); }
+.kt-button-primary:disabled { opacity: 0.6; cursor: progress; }
+.kt-button-secondary { background: var(--surface-2); color: #fff; border: 1px solid var(--surface-3); }
+.kt-button-block { width: 100%; margin-top: 6px; }
+.kt-buttons { display: grid; gap: 10px; }
+
+.kt-alert { margin: 20px 0; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--surface-3); background: var(--surface); font-size: 14px; }
+.kt-alert-error { border-color: rgba(218, 0, 0, 0.6); background: rgba(218, 0, 0, 0.1); color: #ff6b6b; }
+.kt-alert-success { border-color: rgba(0, 221, 112, 0.5); background: rgba(0, 221, 112, 0.08); color: var(--green); }
+.kt-alert-warning, .kt-alert-info { color: var(--soft); }
+
+.kt-info { margin-top: 24px; color: var(--muted); font-size: 14px; }
+
+/* Generic pages rendered by the base theme (errors, update password, logout confirmation...). */
+.kt-card form:not(.kt-form) { display: grid; gap: 18px; margin-top: 24px; }
+.kt-card p { color: var(--soft); line-height: 1.5; }
+.kt-card input[type='submit'] { width: 100%; }
+
+@media (max-width: 860px) {
+  .kt-shell { grid-template-columns: 1fr; }
+  .kt-brand { display: none; }
+  .kt-logo-compact { display: flex; }
+}

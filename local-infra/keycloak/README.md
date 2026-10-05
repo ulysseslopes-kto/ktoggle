@@ -1,4 +1,4 @@
-# Local Keycloak (realm `mobilt`)
+# Local Keycloak (realm `ktoggle`)
 
 The realm is imported by `docker compose up` and is **local only**: these credentials are disposable and the
 file is allowlisted in `.gitleaks.toml`.
@@ -14,8 +14,9 @@ Get a token for the admin API (direct grant is enabled for the local `ktoggle-ui
 
 ```bash
 TOKEN=$(curl -s -d client_id=ktoggle-ui -d grant_type=password -d username=admin.local -d password=admin \
-  http://localhost:8180/realms/mobilt/protocol/openid-connect/token | jq -r .access_token)
+  http://localhost:8180/realms/ktoggle/protocol/openid-connect/token | jq -r .access_token)
 curl -H "Authorization: Bearer $TOKEN" http://localhost:8090/admin/v1/features
 ```
 
-In stg/prd the roles are created in the shared `mobilt` realm and assigned through the usual access process.
+The login pages use the `ktoggle` theme (`themes/ktoggle`), with the same identity as the admin UI. In a future
+corporate setup the realm can federate the company identity provider (SSO) without changing ktoggle.
