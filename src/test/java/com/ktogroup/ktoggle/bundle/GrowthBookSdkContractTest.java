@@ -10,6 +10,8 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.ktogroup.ktoggle.evaluation.EvaluationResult;
 import com.ktogroup.ktoggle.evaluation.GrowthBookEvaluator;
 import com.ktogroup.ktoggle.feature.EnvironmentSettings;
+import com.ktogroup.ktoggle.feature.ExperimentRule;
+import com.ktogroup.ktoggle.feature.ExperimentRule.Variation;
 import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.ForceRule;
 import com.ktogroup.ktoggle.feature.RolloutRule;
@@ -19,7 +21,11 @@ import com.ktogroup.ktoggle.savedgroup.SavedGroup;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupType;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
 import growthbook.sdk.java.GrowthBook;
+import growthbook.sdk.java.callback.TrackingCallback;
+import growthbook.sdk.java.model.Experiment;
+import growthbook.sdk.java.model.ExperimentResult;
 import growthbook.sdk.java.model.GBContext;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -35,6 +41,61 @@ class GrowthBookSdkContractTest {
     private final PayloadCompiler compiler = new PayloadCompiler();
     private final GrowthBookEvaluator evaluator = new GrowthBookEvaluator(objectMapper);
     private final SdkConnection prd = new SdkConnection("sdk-test1234", "test", "prd", List.of(), null, null, null, null);
+
+    @Test
+    void experiment_splits_users_by_weight_sticky_and_reports_exposures() {
+        Rule experiment = experiment("exp-checkout", 1.0, 0.3, 0.7, null);
+        ObjectNode payload = compile(feature("checkout-layout", ValueType.STRING, TextNode.valueOf("classic"),
+                new EnvironmentSettings(true, List.of(experiment))));
+
+        long treatment = IntStream.range(0, 3000)
+                .filter(i -> "new".equals(sdkValue(payload, "checkout-layout", "{\"id\":\"u" + i + "\"}")))
+                .count();
+        assertThat(treatment).as("~70% treatment").isBetween(1950L, 2250L);
+
+        EvaluationResult first = evaluator.evaluate(payload, "checkout-layout", attrs("{\"id\":\"u42\"}"));
+        assertThat(first.source()).isEqualTo("experiment");
+        assertThat(first.experiment().trackingKey()).isEqualTo("exp-checkout");
+        assertThat(first.experiment().inExperiment()).isTrue();
+        assertThat(first.experiment().variationKey()).isIn("control", "treatment");
+        assertThat(IntStream.range(0, 20).mapToObj(i -> evaluator.evaluate(payload, "checkout-layout", attrs("{\"id\":\"u42\"}"))
+                .experiment().variationKey())).as("sticky").containsOnly(first.experiment().variationKey());
+
+        List<String> tracked = new ArrayList<>();
+        new GrowthBook(GBContext.builder().featuresJson(payload.path("features").toString()).attributesJson("{\"id\":\"u7\"}")
+                .trackingCallback(new TrackingCallback() {
+                    @Override
+                    public <T> void onTrack(Experiment<T> exp, ExperimentResult<T> res) {
+                        tracked.add(exp.getKey() + ":" + res.getKey());
+                    }
+                }).build()).getFeatureValue("checkout-layout", "x");
+        assertThat(tracked).singleElement().satisfies(t -> assertThat(t).startsWith("exp-checkout:"));
+    }
+
+    @Test
+    void experiment_respects_coverage_targeting_and_missing_hash_attribute() {
+        Rule nobody = experiment("exp-none", 0.0, 0.5, 0.5, null);
+        Rule brOnly = experiment("exp-br", 1.0, 0.5, 0.5, cond("{\"country\":\"BR\"}"));
+        ObjectNode payload = compile(feature("layout", ValueType.STRING, TextNode.valueOf("classic"),
+                new EnvironmentSettings(true, List.of(nobody, brOnly))));
+
+        EvaluationResult excluded = evaluator.evaluate(payload, "layout", attrs("{\"id\":\"u1\",\"country\":\"AR\"}"));
+        assertThat(excluded.value().asText()).isEqualTo("classic");
+        assertThat(excluded.experiment()).isNull();
+        assertThat(evaluator.evaluate(payload, "layout", attrs("{\"id\":\"u1\",\"country\":\"BR\"}")).experiment().trackingKey())
+                .isEqualTo("exp-br");
+        assertThat(sdkValue(payload, "layout", "{\"country\":\"BR\"}")).as("no hash attribute → not bucketed").isEqualTo("classic");
+        assertThat(payload.path("features").path("layout").path("rules").get(1).path("meta").get(1).path("name").asText())
+                .isEqualTo("New layout");
+    }
+
+    private static Rule experiment(String key, double coverage, double controlWeight, double treatmentWeight, JsonNode condition) {
+        return new ExperimentRule("fr_" + key, "Checkout layout test", true, condition, List.of(),
+                key, "id", coverage, List.of(
+                new Variation("control", "Control", TextNode.valueOf("classic"), controlWeight),
+                new Variation("treatment", "New layout", TextNode.valueOf("new"), treatmentWeight)),
+                2, null);
+    }
 
     @Test
     void force_rule_applies_only_when_condition_matches() {

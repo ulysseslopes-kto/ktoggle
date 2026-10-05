@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ktogroup.ktoggle.feature.EnvironmentSettings;
+import com.ktogroup.ktoggle.feature.ExperimentRule;
 import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.ForceRule;
 import com.ktogroup.ktoggle.feature.RolloutRule;
@@ -73,17 +74,42 @@ public class PayloadCompiler {
         if (condition != null) {
             compiled.set("condition", condition);
         }
-        compiled.set("force", rule.value());
         switch (rule) {
-            case ForceRule ignored -> {
-                // force only
-            }
+            case ForceRule force -> compiled.set("force", force.value());
             case RolloutRule rollout -> {
+                compiled.set("force", rollout.value());
                 compiled.put("coverage", rollout.coverage());
                 compiled.put("hashAttribute", rollout.hashAttribute());
             }
+            case ExperimentRule experiment -> compileExperiment(compiled, experiment);
         }
         return compiled;
+    }
+
+    /** GrowthBook inline experiment rule: the SDK buckets the user and reports the exposure to its tracking callback. */
+    private static void compileExperiment(ObjectNode compiled, ExperimentRule experiment) {
+        compiled.put("key", experiment.trackingKey());
+        compiled.put("name", experiment.description() == null || experiment.description().isBlank()
+                ? experiment.trackingKey() : experiment.description());
+        compiled.put("coverage", experiment.coverage());
+        compiled.put("hashAttribute", experiment.hashAttribute());
+        compiled.put("hashVersion", experiment.hashVersion());
+        if (experiment.seed() != null && !experiment.seed().isBlank()) {
+            compiled.put("seed", experiment.seed());
+        }
+        compiled.put("phase", "0");
+        ArrayNode variations = compiled.putArray("variations");
+        ArrayNode weights = compiled.putArray("weights");
+        ArrayNode meta = compiled.putArray("meta");
+        for (ExperimentRule.Variation variation : experiment.variations()) {
+            variations.add(variation.value());
+            weights.add(variation.weight());
+            ObjectNode m = meta.addObject();
+            m.put("key", variation.key());
+            if (variation.name() != null && !variation.name().isBlank()) {
+                m.put("name", variation.name());
+            }
+        }
     }
 
     private static JsonNode condition(Rule rule, Map<String, SavedGroup> groups) {

@@ -7,14 +7,14 @@ import java.util.List;
 
 /**
  * An override rule evaluated top to bottom; the first matching rule wins, otherwise the default value is served.
- * Experiment rules will join this hierarchy in phase 2.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = ForceRule.class, name = "force"),
-        @JsonSubTypes.Type(value = RolloutRule.class, name = "rollout")
+        @JsonSubTypes.Type(value = RolloutRule.class, name = "rollout"),
+        @JsonSubTypes.Type(value = ExperimentRule.class, name = "experiment")
 })
-public sealed interface Rule permits ForceRule, RolloutRule {
+public sealed interface Rule permits ForceRule, RolloutRule, ExperimentRule {
 
     String id();
 
@@ -28,7 +28,7 @@ public sealed interface Rule permits ForceRule, RolloutRule {
     /** Keys of saved groups the user must belong to (AND), inlined into the condition at compile time. */
     List<String> savedGroups();
 
-    /** Value served when the rule applies. */
+    /** Value served when the rule applies (for experiments: the control variation). */
     JsonNode value();
 
     Rule withId(String newId);

@@ -11,6 +11,7 @@ import com.ktogroup.ktoggle.bundle.Evaluators;
 import com.ktogroup.ktoggle.commons.exception.MessageCode;
 import com.ktogroup.ktoggle.commons.exception.ValidationException;
 import growthbook.sdk.java.GrowthBook;
+import growthbook.sdk.java.model.ExperimentResult;
 import growthbook.sdk.java.model.FeatureResult;
 import growthbook.sdk.java.model.GBContext;
 import java.util.ArrayList;
@@ -57,12 +58,23 @@ public class GrowthBookEvaluator {
             String id = rule.path("id").asText(null);
             boolean matched = !rule.hasNonNull("condition")
                     || Boolean.TRUE.equals(growthBook.evaluateCondition(attributesJson, write(rule.get("condition"))));
-            trace.add(new EvaluationResult.RuleTrace(id, rule.has("coverage") ? "rollout" : "force", matched,
+            trace.add(new EvaluationResult.RuleTrace(id, rule.has("variations") ? "experiment" : rule.has("coverage") ? "rollout" : "force", matched,
                     id != null && id.equals(ruleId)));
         }
         String source = result.getSource() == null ? null : result.getSource().toString();
         return new EvaluationResult(featureKey, toJson(result.getValue()), source, ruleId, Evaluators.REFERENCE_EVALUATOR,
-                List.copyOf(trace));
+                List.copyOf(trace), assignment(result));
+    }
+
+    private static EvaluationResult.ExperimentAssignment assignment(FeatureResult<Object> result) {
+        ExperimentResult<Object> experiment = result.getExperimentResult();
+        if (experiment == null || result.getExperiment() == null) {
+            return null;
+        }
+        Integer index = experiment.getVariationId();
+        return new EvaluationResult.ExperimentAssignment(result.getExperiment().getKey(), experiment.getKey(),
+                index == null ? -1 : index, Boolean.TRUE.equals(experiment.getInExperiment()),
+                experiment.getBucket() == null ? null : experiment.getBucket().doubleValue());
     }
 
     /** SDK values are Gson-typed; round-trip through JSON to get a Jackson tree. */

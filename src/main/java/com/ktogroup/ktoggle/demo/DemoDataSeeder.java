@@ -11,6 +11,7 @@ import com.ktogroup.ktoggle.attribute.AttributeService.AttributeCommand;
 import com.ktogroup.ktoggle.environment.EnvironmentService;
 import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.FeatureService;
+import com.ktogroup.ktoggle.feature.ExperimentRule;
 import com.ktogroup.ktoggle.feature.ForceRule;
 import com.ktogroup.ktoggle.feature.RolloutRule;
 import com.ktogroup.ktoggle.feature.Rule;
@@ -98,7 +99,7 @@ public class DemoDataSeeder {
 
     private void seedFeatures() {
         feature("new-checkout", "payments", ValueType.BOOLEAN, BooleanNode.FALSE, "New deposit checkout flow",
-                List.of("checkout", "deposito"),
+                List.of("checkout", "deposit"),
                 "prd", List.of(
                         force("Beta testers always see it", null, List.of("beta-testers"), BooleanNode.TRUE),
                         new RolloutRule(null, "Gradual rollout in BR (app ≥ 2.3)", true,
@@ -113,7 +114,7 @@ public class DemoDataSeeder {
                 "prd", List.of(force("Carousel on mobile", null, List.of("mobile-users"), TextNode.valueOf("carousel"))),
                 "stg", List.of());
         feature("max-bet-limit", "sportsbook", ValueType.NUMBER, IntNode.valueOf(1000), "Maximum bet limit (BRL)",
-                List.of("risco"),
+                List.of("risk"),
                 "prd", List.of(force("VIP limit", null, List.of("vips"), IntNode.valueOf(50000))),
                 "stg", List.of());
         feature("welcome-bonus", "payments", ValueType.JSON, json("{\"enabled\":false}"), "Welcome bonus configuration",
@@ -121,6 +122,10 @@ public class DemoDataSeeder {
                 "prd", List.of(force("BR campaign", json("{\"country\":\"BR\"}"), List.of(),
                         json("{\"enabled\":true,\"percent\":100,\"maxAmount\":500,\"rollover\":10}"))),
                 "stg", List.of());
+        feature("deposit-button-copy", "payments", ValueType.STRING, TextNode.valueOf("Deposit"), "Deposit button copy (A/B test)",
+                List.of("experiment", "conversion"),
+                "prd", List.of(depositCopyExperiment(0.5)),
+                "stg", List.of(depositCopyExperiment(1.0)));
         features.create("dark-mode", null, ValueType.BOOLEAN, BooleanNode.FALSE, "Dark theme in the app (still in development)",
                 "squad-app", List.of("ux"));
     }
@@ -130,6 +135,14 @@ public class DemoDataSeeder {
         Feature feature = features.create(key, project, type, defaultValue, description, "squad-" + project, tags);
         feature = features.updateEnvironment(key, env1, true, rules1, feature.version());
         features.updateEnvironment(key, env2, true, rules2, feature.version());
+    }
+
+    private static ExperimentRule depositCopyExperiment(double coverage) {
+        return new ExperimentRule(null, "Deposit button copy", true, null, List.of(), "deposit-button-copy", "id", coverage,
+                List.of(new ExperimentRule.Variation("0", "Control", TextNode.valueOf("Deposit"), 0.34),
+                        new ExperimentRule.Variation("1", "Add funds", TextNode.valueOf("Add funds"), 0.33),
+                        new ExperimentRule.Variation("2", "Play now", TextNode.valueOf("Deposit & play"), 0.33)),
+                ExperimentRule.DEFAULT_HASH_VERSION, null);
     }
 
     private static ForceRule force(String description, JsonNode condition, List<String> groups, JsonNode value) {

@@ -31,6 +31,54 @@ class RuleValidatorTest {
     private final Set<String> groups = Set.of("vips");
 
     @Test
+    void a_valid_experiment_is_accepted() {
+        assertThat(validator.validate(ValueType.BOOLEAN, List.of(experiment("exp-1", 1.0, "userId",
+                variation("control", false, 0.5), variation("treatment", true, 0.5))), attributes, groups)).hasSize(1);
+    }
+
+    @Test
+    void experiments_are_validated_thoroughly() {
+        assertThatThrownBy(() -> validator.validate(ValueType.BOOLEAN, List.of(experiment(" bad key", 1.0, "userId",
+                variation("a", false, 0.5), variation("b", true, 0.5))), attributes, groups)).hasMessageContaining("trackingKey");
+        assertThatThrownBy(() -> validator.validate(ValueType.BOOLEAN, List.of(experiment("exp", 1.0, "userId",
+                variation("a", false, 1.0))), attributes, groups)).hasMessageContaining("between 2 and 20 variations");
+        assertThatThrownBy(() -> validator.validate(ValueType.BOOLEAN, List.of(experiment("exp", 1.0, "userId",
+                variation("a", false, 0.5), variation("a", true, 0.5))), attributes, groups)).hasMessageContaining("unique");
+        assertThatThrownBy(() -> validator.validate(ValueType.BOOLEAN, List.of(experiment("exp", 1.0, "userId",
+                variation("a", false, 0.5), variation("b", true, 0.4))), attributes, groups)).hasMessageContaining("add up to 100%");
+        assertThatThrownBy(() -> validator.validate(ValueType.BOOLEAN, List.of(experiment("exp", 1.0, "userId",
+                variation("a", false, -0.5), variation("b", true, 1.5))), attributes, groups)).hasMessageContaining("zero or positive");
+        assertThatThrownBy(() -> validator.validate(ValueType.STRING, List.of(experiment("exp", 1.0, "userId",
+                variation("a", false, 0.5), variation("b", true, 0.5))), attributes, groups))
+                .isInstanceOfSatisfying(ValidationException.class, e -> assertThat(e.getMessageCode()).isEqualTo(MessageCode.INVALID_VALUE));
+        assertThatThrownBy(() -> validator.validate(ValueType.BOOLEAN, List.of(experiment("exp", 2.0, "userId",
+                variation("a", false, 0.5), variation("b", true, 0.5))), attributes, groups)).hasMessageContaining("coverage");
+        assertThatThrownBy(() -> validator.validate(ValueType.BOOLEAN, List.of(experiment("exp", 1.0, "vip",
+                variation("a", false, 0.5), variation("b", true, 0.5))), attributes, groups)).hasMessageContaining("STRING or NUMBER");
+        assertThatThrownBy(() -> validator.validate(ValueType.BOOLEAN, List.of(new ExperimentRule(null, null, true, null, List.of(),
+                "exp", "userId", 1.0, List.of(variation("a", false, 0.5), variation("b", true, 0.5)), 3, null)), attributes, groups))
+                .hasMessageContaining("hashVersion");
+    }
+
+    @Test
+    void an_experiment_defaults_to_hash_version_2_and_uses_its_control_as_representative_value() {
+        ExperimentRule rule = new ExperimentRule(null, null, true, null, null, "exp", "userId", 1.0,
+                List.of(variation("control", false, 0.5), variation("treatment", true, 0.5)), 0, null);
+        assertThat(rule.hashVersion()).isEqualTo(2);
+        assertThat(rule.value().asBoolean()).isFalse();
+        assertThat(rule.savedGroups()).isEmpty();
+        assertThat(new ExperimentRule(null, null, true, null, null, "exp", "userId", 1.0, null, 2, null).value()).isNull();
+    }
+
+    private static ExperimentRule experiment(String key, double coverage, String hashAttribute, ExperimentRule.Variation... variations) {
+        return new ExperimentRule(null, null, true, null, List.of(), key, hashAttribute, coverage, List.of(variations), 2, null);
+    }
+
+    private static ExperimentRule.Variation variation(String key, boolean value, double weight) {
+        return new ExperimentRule.Variation(key, key, JSON.booleanNode(value), weight);
+    }
+
+    @Test
     void no_rules_means_an_empty_list() {
         assertThat(validator.validate(ValueType.BOOLEAN, null, attributes, groups)).isEmpty();
         assertThat(validator.validate(ValueType.BOOLEAN, List.of(), attributes, groups)).isEmpty();

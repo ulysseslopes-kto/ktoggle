@@ -216,6 +216,39 @@ class KtoggleFlowIT {
     }
 
     @Test
+    void experiments_are_served_in_growthbook_format_and_replay_reports_the_assignment() throws Exception {
+        Setup s = setup();
+        Map<String, Object> experiment = Map.of("type", "experiment", "enabled", true, "description", "Checkout copy",
+                "trackingKey", "exp-" + s.feature(), "hashAttribute", "userId", "coverage", 1.0,
+                "variations", List.of(Map.of("key", "0", "name", "Control", "value", false, "weight", 0.5),
+                        Map.of("key", "1", "name", "Treatment", "value", true, "weight", 0.5)));
+        new Fixtures(admin).publishEnvironment(s.feature(), s.environment(), true, List.of(experiment));
+
+        JsonNode rule = fetch(s.clientKey()).body().path("features").path(s.feature()).path("rules").get(0);
+        assertThat(rule.path("key").asText()).isEqualTo("exp-" + s.feature());
+        assertThat(rule.path("variations")).hasSize(2);
+        assertThat(rule.path("weights").get(1).asDouble()).isEqualTo(0.5);
+        assertThat(rule.path("meta").get(1).path("key").asText()).isEqualTo("1");
+        assertThat(rule.path("hashVersion").asInt()).isEqualTo(2);
+        assertThat(rule.has("force")).as("experiments must not be compiled as forced values").isFalse();
+
+        JsonNode replay = admin.postJson("/admin/v1/replay", Map.of("bundleHash", fetch(s.clientKey()).hash(),
+                "featureKey", s.feature(), "attributes", Map.of("userId", "user-42")), 200);
+        JsonNode assignment = replay.path("result").path("experiment");
+        assertThat(assignment.path("trackingKey").asText()).isEqualTo("exp-" + s.feature());
+        assertThat(assignment.path("inExperiment").asBoolean()).isTrue();
+        assertThat(replay.path("result").path("value").asBoolean())
+                .isEqualTo(assignment.path("variationIndex").asInt() == 1);
+
+        // The admin API returns the rule with server-computed fields; sending it back unchanged (as the UI does for
+        // untouched rules) must be accepted.
+        JsonNode stored = admin.getJson("/admin/v1/features/" + s.feature()).path("environments").path(s.environment()).path("rules");
+        assertThat(stored.get(0).path("type").asText()).isEqualTo("experiment");
+        new Fixtures(admin).publishEnvironment(s.feature(), s.environment(), false,
+                List.of(objectMapper.convertValue(stored.get(0), Map.class)));
+    }
+
+    @Test
     void invalid_rules_are_rejected_with_details() throws Exception {
         Setup s = setup();
         JsonNode draft = new Fixtures(admin).draft(s.feature());
