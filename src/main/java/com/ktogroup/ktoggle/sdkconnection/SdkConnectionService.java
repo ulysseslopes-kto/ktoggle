@@ -6,7 +6,9 @@ import com.ktogroup.ktoggle.audit.EntityType;
 import com.ktogroup.ktoggle.commons.change.ChangeContext;
 import com.ktogroup.ktoggle.commons.change.ChangeContextProvider;
 import com.ktogroup.ktoggle.commons.change.ConfigurationChangedEvent;
+import com.ktogroup.ktoggle.commons.change.DeliverySettingsChangedEvent;
 import com.ktogroup.ktoggle.commons.exception.ConflictException;
+import com.ktogroup.ktoggle.commons.exception.MessageCode;
 import com.ktogroup.ktoggle.commons.exception.NotFoundException;
 import com.ktogroup.ktoggle.commons.exception.ValidationException;
 import com.ktogroup.ktoggle.commons.time.Ids;
@@ -15,7 +17,9 @@ import com.ktogroup.ktoggle.project.ProjectService;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -49,6 +53,11 @@ public class SdkConnectionService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<SdkConnection> find(String clientKey) {
+        return persistence.findByClientKey(clientKey);
+    }
+
+    @Transactional(readOnly = true)
     public SdkConnection get(String clientKey) {
         return persistence.findByClientKey(clientKey).orElseThrow(() -> new NotFoundException(ENTITY, clientKey));
     }
@@ -77,24 +86,60 @@ public class SdkConnectionService {
 
     @Transactional
     public SdkConnection update(String clientKey, String name, List<String> projectKeys, long expectedVersion) {
+        return update(clientKey, name, projectKeys, null, expectedVersion);
+    }
+
+    /** @param encryptPayload null keeps the current setting; turning it on creates a key when there is none */
+    @Transactional
+    public SdkConnection update(String clientKey, String name, List<String> projectKeys, Boolean encryptPayload,
+                                long expectedVersion) {
         SdkConnection current = get(clientKey);
         if (current.version() != expectedVersion) {
             throw ConflictException.staleVersion(ENTITY, clientKey, expectedVersion, current.version());
         }
-        SdkConnection saved = persistence.save(new SdkConnection(clientKey, name, current.environmentKey(),
-                validProjects(projectKeys), current.pinnedBundleHash(), current.createdAt(), Ids.now(clock), current.version()));
+        boolean encrypt = encryptPayload == null ? current.encryptPayload() : encryptPayload;
+        SdkConnection saved = persistence.save(current.withName(name).withProjectKeys(validProjects(projectKeys))
+                .withEncryptPayload(encrypt)
+                .withDecryptionKey(encrypt && current.decryptionKey() == null ? generateDecryptionKey() : current.decryptionKey())
+                .withUpdatedAt(Ids.now(clock)));
         ChangeContext context = changeContextProvider.current();
         auditService.record(context, AuditAction.UPDATE, EntityType.SDK_CONNECTION, clientKey, current, saved);
         events.publishEvent(new ConfigurationChangedEvent(context));
+        if (!saved.deliveryMode().equals(current.deliveryMode())) {
+            events.publishEvent(new DeliverySettingsChangedEvent(clientKey));
+        }
         return saved;
+    }
+
+    /**
+     * Replaces the decryption key. SDKs holding the old key stop decrypting new payloads until they get the new one,
+     * so rotate when the key leaked, and roll the new key out to the apps right away.
+     */
+    @Transactional
+    public SdkConnection rotateDecryptionKey(String clientKey) {
+        SdkConnection current = get(clientKey);
+        SdkConnection saved = persistence.save(current.withDecryptionKey(generateDecryptionKey()).withUpdatedAt(Ids.now(clock)));
+        auditService.record(changeContextProvider.current(), AuditAction.UPDATE, EntityType.SDK_CONNECTION, clientKey, current,
+                saved);
+        events.publishEvent(new DeliverySettingsChangedEvent(clientKey));
+        return saved;
+    }
+
+    /** The key to configure in this connection's SDKs (admin only). */
+    @Transactional(readOnly = true)
+    public String decryptionKey(String clientKey) {
+        SdkConnection connection = get(clientKey);
+        if (connection.decryptionKey() == null) {
+            throw new NotFoundException(MessageCode.ENTITY_NOT_FOUND, "Payload encryption is not enabled for " + clientKey);
+        }
+        return connection.decryptionKey();
     }
 
     /** Used by the bundle module for emergency rollback (pin) and its release (unpin). */
     @Transactional
     public SdkConnection setPinnedBundle(String clientKey, String bundleHash) {
         SdkConnection current = get(clientKey);
-        return persistence.save(new SdkConnection(clientKey, current.name(), current.environmentKey(),
-                current.projectKeys(), bundleHash, current.createdAt(), Ids.now(clock), current.version()));
+        return persistence.save(current.withPinnedBundleHash(bundleHash).withUpdatedAt(Ids.now(clock)));
     }
 
     private List<String> validProjects(List<String> projectKeys) {
@@ -103,6 +148,13 @@ public class SdkConnectionService {
         }
         projectKeys.forEach(projectService::get);
         return projectKeys.stream().distinct().sorted().toList();
+    }
+
+    /** 128-bit AES key, base64, as GrowthBook SDKs expect. */
+    private static String generateDecryptionKey() {
+        byte[] key = new byte[16];
+        RANDOM.nextBytes(key);
+        return Base64.getEncoder().encodeToString(key);
     }
 
     private static String generateClientKey() {

@@ -82,6 +82,6 @@ class SseHubTest {
     }
 
     private static ServedPayload payload(String clientKey, String hash) {
-        return new ServedPayload(clientKey, hash, 1, Instant.parse("2026-10-05T12:00:00Z"), "{\"features\":{}}");
+        return new ServedPayload(clientKey, hash, 1, Instant.parse("2026-10-05T12:00:00Z"), "plain", "{\"features\":{}}");
     }
 }

@@ -60,6 +60,7 @@ public class SecurityConfiguration {
     private static final String[] ADMIN_ONLY_READ = {
             "/admin/v1/api-tokens/**",
             "/admin/v1/webhooks/**",
+            "/admin/v1/sdk-connections/*/decryption-key",
     };
 
     @Bean

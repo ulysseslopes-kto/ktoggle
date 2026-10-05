@@ -55,7 +55,7 @@ class DecisionIngestServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(registry.get("sdk-a")).thenReturn(Optional.of(new ServedPayload("sdk-a", HASH, 1, NOW, "{}")));
+        when(registry.get("sdk-a")).thenReturn(Optional.of(new ServedPayload("sdk-a", HASH, 1, NOW, "plain", "{}")));
         when(attributeService.findAll()).thenReturn(List.of(
                 attribute("country", false, false),
                 attribute("userId", true, false),

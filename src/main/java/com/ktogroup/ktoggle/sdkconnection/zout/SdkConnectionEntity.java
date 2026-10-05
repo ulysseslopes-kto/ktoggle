@@ -38,6 +38,12 @@ public class SdkConnectionEntity {
     @Column(name = "pinned_bundle_hash")
     private String pinnedBundleHash;
 
+    @Column(name = "encrypt_payload", nullable = false)
+    private boolean encryptPayload;
+
+    @Column(name = "decryption_key")
+    private String decryptionKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

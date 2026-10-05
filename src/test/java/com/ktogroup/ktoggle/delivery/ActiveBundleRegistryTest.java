@@ -12,7 +12,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.ktogroup.ktoggle.bundle.Bundle;
 import com.ktogroup.ktoggle.bundle.BundleActivatedEvent;
 import com.ktogroup.ktoggle.bundle.BundleActivation;
+import com.ktogroup.ktoggle.bundle.ActivationNotifier;
 import com.ktogroup.ktoggle.bundle.BundlePersistencePort;
+import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
+import com.ktogroup.ktoggle.sdkconnection.SdkConnectionService;
 import com.ktogroup.ktoggle.ztest.TestBundles;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
@@ -26,8 +29,9 @@ class ActiveBundleRegistryTest {
     private final BundlePersistencePort persistence = mock(BundlePersistencePort.class);
     private final SseHub sseHub = mock(SseHub.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
+    private final SdkConnectionService connections = mock(SdkConnectionService.class);
     private final ActiveBundleRegistry registry = new ActiveBundleRegistry(persistence, testBundles.codec(),
-            testBundles.objectMapper(), sseHub, meters);
+            testBundles.objectMapper(), sseHub, meters, connections, mock(ActivationNotifier.class));
 
     @Test
     void a_verified_bundle_is_served_in_the_growthbook_response_shape() throws Exception {
@@ -44,6 +48,34 @@ class ActiveBundleRegistryTest {
         assertThat(body.path("experiments")).isEmpty();
         assertThat(body.path("bundleHash").asText()).isEqualTo(bundle.hash());
         assertThat(body.path("dateUpdated").asText()).isEqualTo(TestBundles.CREATED_AT.plusSeconds(1).toString());
+    }
+
+    @Test
+    void encrypted_connections_get_encrypted_features_and_a_key_rotation_re_renders_them() throws Exception {
+        Bundle bundle = publish("sdk-a", 1, true);
+        SdkConnection encrypted = new SdkConnection("sdk-a", "web", "prd", List.of(), null, true, "AAECAwQFBgcICQoLDA0ODw==",
+                TestBundles.CREATED_AT, TestBundles.CREATED_AT, 0L);
+        when(connections.find("sdk-a")).thenReturn(Optional.of(encrypted));
+
+        ServedPayload served = registry.get("sdk-a").orElseThrow();
+        JsonNode body = testBundles.objectMapper().readTree(served.body());
+        assertThat(body.path("features")).as("nothing readable in clear").isEmpty();
+        assertThat(body.path("bundleHash").asText()).isEqualTo(bundle.hash());
+        JsonNode features = testBundles.objectMapper().readTree(
+                PayloadEncryption.decrypt(body.path("encryptedFeatures").asText(), encrypted.decryptionKey()));
+        assertThat(features.path("checkout").path("defaultValue").asBoolean()).isTrue();
+
+        SdkConnection rotated = encrypted.withDecryptionKey("DwAOAA0ADAALAAoACQAIAA==");
+        when(connections.find("sdk-a")).thenReturn(Optional.of(rotated));
+        when(connections.findAll()).thenReturn(List.of(rotated));
+        when(persistence.findCurrentActivations()).thenReturn(List.of(TestBundles.activation("sdk-a", 1, bundle.hash(), null)));
+        registry.resync();
+
+        ServedPayload rerendered = registry.get("sdk-a").orElseThrow();
+        assertThat(rerendered.deliveryMode()).isEqualTo(rotated.deliveryMode()).isNotEqualTo(served.deliveryMode());
+        String encryptedFeatures = testBundles.objectMapper().readTree(rerendered.body()).path("encryptedFeatures").asText();
+        assertThat(PayloadEncryption.decrypt(encryptedFeatures, rotated.decryptionKey())).contains("checkout");
+        verify(sseHub).broadcast(rerendered);
     }
 
     @Test

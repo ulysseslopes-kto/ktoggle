@@ -116,9 +116,9 @@ yet.
 
 ## Roadmap
 
-- **Done:** flags and targeting, A/B experiment rules, scheduled rules, prerequisites, saved groups (all / any / none), API tokens, webhooks (Slack or signed JSON), per-project permissions, drafts with configurable review and approval, auditable bundles, replay, delivery and
+- **Done:** flags and targeting, A/B experiment rules, scheduled rules, prerequisites, saved groups (all / any / none), API tokens, webhooks (Slack or signed JSON), per-project permissions, encrypted payloads, drafts with configurable review and approval, auditable bundles, replay, delivery and
   decision logs, admin UI (`ktoggle-ui`), one-command demo.
-- **Next:** encrypted payloads and remote evaluation.
+- **Next:** remote evaluation.
 - **After the evaluation:** how ktoggle is rolled out inside the company.
 
 See the [development guide](docs/DEVELOPMENT.md) for conventions and code invariants.

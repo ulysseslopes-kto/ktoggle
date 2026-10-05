@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import com.ktogroup.ktoggle.delivery.PayloadEncryption;
 import com.ktogroup.ktoggle.evaluation.EvaluationResult;
 import com.ktogroup.ktoggle.evaluation.GrowthBookEvaluator;
 import com.ktogroup.ktoggle.feature.EnvironmentSettings;
@@ -27,6 +28,7 @@ import growthbook.sdk.java.callback.TrackingCallback;
 import growthbook.sdk.java.model.Experiment;
 import growthbook.sdk.java.model.ExperimentResult;
 import growthbook.sdk.java.model.GBContext;
+import growthbook.sdk.java.util.DecryptionUtils;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -213,6 +215,24 @@ class GrowthBookSdkContractTest {
         boolean first = sdkIsOn(payload, "half", "{\"userId\":\"u42\"}");
         assertThat(IntStream.range(0, 20).allMatch(i -> sdkIsOn(payload, "half", "{\"userId\":\"u42\"}") == first)).isTrue();
         assertThat(sdkIsOn(payload, "half", "{}")).as("users without the hash attribute are excluded").isFalse();
+    }
+
+    @Test
+    void encrypted_features_are_decrypted_by_the_official_sdk() throws Exception {
+        Rule rule = new ForceRule("fr_br", null, true, cond("{\"country\":\"BR\"}"), List.of(), BooleanNode.TRUE);
+        ObjectNode payload = compile(feature("secret-flag", ValueType.BOOLEAN, BooleanNode.FALSE,
+                new EnvironmentSettings(true, List.of(rule))));
+        String key = "AAECAwQFBgcICQoLDA0ODw==";
+        String plain = payload.path("features").toString();
+        String encrypted = PayloadEncryption.encrypt(plain, key);
+
+        assertThat(encrypted).matches("^[A-Za-z0-9+/=]+\\.[A-Za-z0-9+/=]+$").doesNotContain("secret-flag");
+        // exactly what GBFeaturesRepository does with encryptedFeatures
+        String decrypted = DecryptionUtils.decrypt(encrypted, key).trim();
+        assertThat(decrypted).isEqualTo(plain);
+        assertThat(Boolean.TRUE.equals(new GrowthBook(GBContext.builder().featuresJson(decrypted)
+                .attributesJson("{\"country\":\"BR\"}").build()).isOn("secret-flag"))).isTrue();
+        assertThat(PayloadEncryption.encrypt(plain, key)).as("random IV").isNotEqualTo(encrypted);
     }
 
     @Test

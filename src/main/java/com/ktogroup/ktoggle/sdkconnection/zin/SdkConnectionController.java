@@ -5,8 +5,10 @@ import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnectionService;
 import com.ktogroup.ktoggle.sdkconnection.zdto.SdkConnectionRequest;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -42,7 +44,11 @@ public class SdkConnectionController {
         if (request.environmentKey() == null) {
             throw ValidationException.of("environmentKey is required");
         }
-        return sdkConnectionService.create(request.clientKey(), request.name(), request.environmentKey(), request.projectKeys());
+        SdkConnection created = sdkConnectionService.create(request.clientKey(), request.name(), request.environmentKey(),
+                request.projectKeys());
+        return Boolean.TRUE.equals(request.encryptPayload())
+                ? sdkConnectionService.update(created.clientKey(), created.name(), created.projectKeys(), true, created.version())
+                : created;
     }
 
     @PutMapping("/{clientKey}")
@@ -50,6 +56,19 @@ public class SdkConnectionController {
         if (request.version() == null) {
             throw ValidationException.of("version is required on update");
         }
-        return sdkConnectionService.update(clientKey, request.name(), request.projectKeys(), request.version());
+        return sdkConnectionService.update(clientKey, request.name(), request.projectKeys(), request.encryptPayload(),
+                request.version());
+    }
+
+    @Operation(summary = "Decryption key to configure in this connection's SDKs (admin only)")
+    @GetMapping("/{clientKey}/decryption-key")
+    public Map<String, String> decryptionKey(@PathVariable String clientKey) {
+        return Map.of("decryptionKey", sdkConnectionService.decryptionKey(clientKey));
+    }
+
+    @Operation(summary = "Replace the decryption key; SDKs need the new key to read new payloads")
+    @PostMapping("/{clientKey}/rotate-key")
+    public SdkConnection rotateKey(@PathVariable String clientKey) {
+        return sdkConnectionService.rotateDecryptionKey(clientKey);
     }
 }

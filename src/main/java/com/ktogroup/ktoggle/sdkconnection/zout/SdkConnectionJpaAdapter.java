@@ -43,12 +43,15 @@ public class SdkConnectionJpaAdapter implements SdkConnectionPersistencePort {
         entity.setName(connection.name());
         entity.setProjectKeys(connection.projectKeys());
         entity.setPinnedBundleHash(connection.pinnedBundleHash());
+        entity.setEncryptPayload(connection.encryptPayload());
+        entity.setDecryptionKey(connection.decryptionKey());
         entity.setUpdatedAt(connection.updatedAt());
         return toDomain(repository.saveAndFlush(entity));
     }
 
     private static SdkConnection toDomain(SdkConnectionEntity e) {
         return new SdkConnection(e.getClientKey(), e.getName(), e.getEnvironmentKey(), List.copyOf(e.getProjectKeys()),
-                e.getPinnedBundleHash(), e.getCreatedAt(), e.getUpdatedAt(), e.getVersion());
+                e.getPinnedBundleHash(), e.isEncryptPayload(), e.getDecryptionKey(), e.getCreatedAt(), e.getUpdatedAt(),
+                e.getVersion());
     }
 }
