@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.ktogroup.ktoggle.delivery.PayloadEncryption;
 import com.ktogroup.ktoggle.evaluation.EvaluationResult;
 import com.ktogroup.ktoggle.evaluation.GrowthBookEvaluator;
+import com.ktogroup.ktoggle.delivery.RemoteEvaluator;
 import com.ktogroup.ktoggle.feature.EnvironmentSettings;
 import com.ktogroup.ktoggle.feature.ExperimentRule;
 import com.ktogroup.ktoggle.feature.ExperimentRule.Variation;
@@ -215,6 +216,42 @@ class GrowthBookSdkContractTest {
         boolean first = sdkIsOn(payload, "half", "{\"userId\":\"u42\"}");
         assertThat(IntStream.range(0, 20).allMatch(i -> sdkIsOn(payload, "half", "{\"userId\":\"u42\"}") == first)).isTrue();
         assertThat(sdkIsOn(payload, "half", "{}")).as("users without the hash attribute are excluded").isFalse();
+    }
+
+    @Test
+    void remote_evaluation_returns_the_same_values_as_local_evaluation_and_still_tracks_experiments() {
+        Feature checkout = feature("checkout-layout", ValueType.STRING, TextNode.valueOf("classic"),
+                new EnvironmentSettings(true, List.of(experiment("exp-checkout", 0.8, 0.5, 0.5, null))));
+        Feature beta = feature("beta", ValueType.BOOLEAN, BooleanNode.FALSE, new EnvironmentSettings(true, List.of(
+                new ForceRule("fr_br", null, true, cond("{\"country\":\"BR\"}"), List.of(), BooleanNode.TRUE),
+                new RolloutRule("rr_half", null, true, null, List.of(), BooleanNode.TRUE, 0.5, "id"))));
+        ObjectNode payload = compiler.compile(prd, List.of(checkout, beta), Map.of(), NOW).payload();
+        RemoteEvaluator remote = new RemoteEvaluator(objectMapper);
+
+        for (int i = 0; i < 500; i++) {
+            String attributes = "{\"id\":\"u" + i + "\",\"country\":\"" + (i % 3 == 0 ? "BR" : "PT") + "\"}";
+            JsonNode evaluated = remote.evaluate(payload.path("features"), attrs(attributes), Map.of(), Map.of(), null);
+            ObjectNode remotePayload = objectMapper.createObjectNode();
+            remotePayload.set("features", evaluated);
+            assertThat(sdkValue(remotePayload, "checkout-layout", "{}")).isEqualTo(sdkValue(payload, "checkout-layout", attributes));
+            assertThat(sdkIsOn(remotePayload, "beta", "{}")).isEqualTo(sdkIsOn(payload, "beta", attributes));
+            assertThat(evaluated.toString()).as("no targeting reaches the client").doesNotContain("country").doesNotContain("coverage");
+        }
+
+        // the tracks carry exactly the assignment local evaluation makes (the JS SDK fires its tracking callback from them)
+        EvaluationResult local = evaluator.evaluate(payload, "checkout-layout", attrs("{\"id\":\"u1\"}"));
+        JsonNode remoteU1 = remote.evaluate(payload.path("features"), attrs("{\"id\":\"u1\"}"), Map.of(), Map.of(), null);
+        JsonNode track = remoteU1.path("checkout-layout").path("rules").get(0).path("tracks").get(0);
+        assertThat(local.experiment().inExperiment()).isTrue();
+        assertThat(track.path("experiment").path("key").asText()).isEqualTo("exp-checkout");
+        assertThat(track.path("result").path("key").asText()).isEqualTo(local.experiment().variationKey());
+        assertThat(track.path("result").path("variationId").asInt()).isEqualTo(local.experiment().variationIndex());
+        assertThat(track.path("experiment").has("weights")).as("the rollout plan stays on the server").isFalse();
+
+        JsonNode forced = remote.evaluate(payload.path("features"), attrs("{\"id\":\"u1\"}"), Map.of("exp-checkout", 1),
+                Map.of("beta", BooleanNode.TRUE), null);
+        assertThat(forced.path("checkout-layout").path("defaultValue").asText()).isEqualTo("new");
+        assertThat(forced.path("beta").path("defaultValue").asBoolean()).isTrue();
     }
 
     @Test

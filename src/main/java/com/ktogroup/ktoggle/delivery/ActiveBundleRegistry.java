@@ -114,7 +114,8 @@ public class ActiveBundleRegistry {
                     .orElseThrow(() -> new IntegrityException("Activated bundle %s is missing".formatted(activation.bundleHash())));
             BundleBody body = codec.verify(bundle);
             ServedPayload payload = new ServedPayload(activation.clientKey(), bundle.hash(), activation.position(),
-                    activation.activatedAt(), mode, render(body, activation, connection.orElse(null)));
+                    activation.activatedAt(), mode, render(body, activation, connection.orElse(null)),
+                    body.payload().get("features"));
             served.put(activation.clientKey(), payload);
             return Optional.of(payload);
         } catch (IntegrityException e) {
@@ -132,7 +133,10 @@ public class ActiveBundleRegistry {
     private String render(BundleBody body, BundleActivation activation, SdkConnection connection) {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("status", 200);
-        if (connection != null && !PLAIN.equals(connection.deliveryMode())) {
+        if (connection != null && connection.remoteEval()) {
+            // remote evaluation: rules never leave the server; SDKs POST /api/eval for values
+            response.putObject("features");
+        } else if (connection != null && !PLAIN.equals(connection.deliveryMode())) {
             response.putObject("features");
             response.put("encryptedFeatures", PayloadEncryption.encrypt(write(body.payload().get("features")),
                     connection.decryptionKey()));

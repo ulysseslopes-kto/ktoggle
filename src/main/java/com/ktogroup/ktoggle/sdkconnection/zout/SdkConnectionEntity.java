@@ -44,6 +44,9 @@ public class SdkConnectionEntity {
     @Column(name = "decryption_key")
     private String decryptionKey;
 
+    @Column(name = "remote_eval", nullable = false)
+    private boolean remoteEval;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

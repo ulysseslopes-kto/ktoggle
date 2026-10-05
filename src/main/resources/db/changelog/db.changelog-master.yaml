@@ -23,3 +23,5 @@ databaseChangeLog:
       file: db/changelog/changes/0011-project-editors.sql
   - include:
       file: db/changelog/changes/0012-encrypted-payloads.sql
+  - include:
+      file: db/changelog/changes/0013-remote-eval.sql

@@ -13,15 +13,20 @@ import lombok.With;
  * @param pinnedBundleHash when set (emergency rollback), automatic publication is suspended for this connection
  * @param encryptPayload   serve {@code encryptedFeatures} (AES-128-CBC) instead of clear-text features; SDKs need the key
  * @param decryptionKey    base64 AES key given to this connection's SDKs; never serialized (admins read it explicitly)
+ * @param remoteEval       SDKs post their attributes to {@code /api/eval} and get evaluated values; rules never leave
+ *                         the server (cannot be combined with encryption, as in GrowthBook)
  */
 @With
 public record SdkConnection(String clientKey, String name, String environmentKey, List<String> projectKeys,
                             String pinnedBundleHash, boolean encryptPayload, @JsonIgnore String decryptionKey,
-                            Instant createdAt, Instant updatedAt, Long version) {
+                            boolean remoteEval, Instant createdAt, Instant updatedAt, Long version) {
+
+    public static final String PLAIN = "plain";
+    public static final String REMOTE_EVAL = "remote-eval";
 
     public SdkConnection(String clientKey, String name, String environmentKey, List<String> projectKeys,
                          String pinnedBundleHash, Instant createdAt, Instant updatedAt, Long version) {
-        this(clientKey, name, environmentKey, projectKeys, pinnedBundleHash, false, null, createdAt, updatedAt, version);
+        this(clientKey, name, environmentKey, projectKeys, pinnedBundleHash, false, null, false, createdAt, updatedAt, version);
     }
 
     public boolean includesProject(String projectKey) {
@@ -34,9 +39,12 @@ public record SdkConnection(String clientKey, String name, String environmentKey
         return decryptionKey == null ? null : Hashes.sha256Hex(decryptionKey).substring(0, 12);
     }
 
-    /** What the delivery layer must render: clear text, or encrypted with a given key. */
+    /** What the delivery layer must render: clear text, encrypted with a given key, or nothing (remote evaluation). */
     @JsonIgnore
     public String deliveryMode() {
-        return encryptPayload && decryptionKey != null ? "aes:" + keyFingerprint() : "plain";
+        if (remoteEval) {
+            return REMOTE_EVAL;
+        }
+        return encryptPayload && decryptionKey != null ? "aes:" + keyFingerprint() : PLAIN;
     }
 }

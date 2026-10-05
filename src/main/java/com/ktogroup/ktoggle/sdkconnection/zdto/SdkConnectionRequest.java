@@ -13,5 +13,6 @@ public record SdkConnectionRequest(
         String environmentKey,
         List<String> projectKeys,
         Boolean encryptPayload,
+        Boolean remoteEval,
         Long version) {
 }

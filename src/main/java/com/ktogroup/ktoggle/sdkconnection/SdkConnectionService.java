@@ -86,20 +86,34 @@ public class SdkConnectionService {
 
     @Transactional
     public SdkConnection update(String clientKey, String name, List<String> projectKeys, long expectedVersion) {
-        return update(clientKey, name, projectKeys, null, expectedVersion);
+        return update(clientKey, name, projectKeys, null, null, expectedVersion);
     }
 
-    /** @param encryptPayload null keeps the current setting; turning it on creates a key when there is none */
     @Transactional
     public SdkConnection update(String clientKey, String name, List<String> projectKeys, Boolean encryptPayload,
                                 long expectedVersion) {
+        return update(clientKey, name, projectKeys, encryptPayload, null, expectedVersion);
+    }
+
+    /**
+     * @param encryptPayload null keeps the current setting; turning it on creates a key when there is none
+     * @param remoteEval     null keeps the current setting
+     */
+    @Transactional
+    public SdkConnection update(String clientKey, String name, List<String> projectKeys, Boolean encryptPayload,
+                                Boolean remoteEval, long expectedVersion) {
         SdkConnection current = get(clientKey);
         if (current.version() != expectedVersion) {
             throw ConflictException.staleVersion(ENTITY, clientKey, expectedVersion, current.version());
         }
         boolean encrypt = encryptPayload == null ? current.encryptPayload() : encryptPayload;
+        boolean remote = remoteEval == null ? current.remoteEval() : remoteEval;
+        if (encrypt && remote) {
+            throw ValidationException.of("Remote evaluation and payload encryption cannot be combined: "
+                    + "with remote evaluation the rules never reach the SDK");
+        }
         SdkConnection saved = persistence.save(current.withName(name).withProjectKeys(validProjects(projectKeys))
-                .withEncryptPayload(encrypt)
+                .withEncryptPayload(encrypt).withRemoteEval(remote)
                 .withDecryptionKey(encrypt && current.decryptionKey() == null ? generateDecryptionKey() : current.decryptionKey())
                 .withUpdatedAt(Ids.now(clock)));
         ChangeContext context = changeContextProvider.current();

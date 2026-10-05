@@ -53,7 +53,7 @@ class ActiveBundleRegistryTest {
     @Test
     void encrypted_connections_get_encrypted_features_and_a_key_rotation_re_renders_them() throws Exception {
         Bundle bundle = publish("sdk-a", 1, true);
-        SdkConnection encrypted = new SdkConnection("sdk-a", "web", "prd", List.of(), null, true, "AAECAwQFBgcICQoLDA0ODw==",
+        SdkConnection encrypted = new SdkConnection("sdk-a", "web", "prd", List.of(), null, true, "AAECAwQFBgcICQoLDA0ODw==", false,
                 TestBundles.CREATED_AT, TestBundles.CREATED_AT, 0L);
         when(connections.find("sdk-a")).thenReturn(Optional.of(encrypted));
 

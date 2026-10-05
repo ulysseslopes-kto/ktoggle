@@ -23,6 +23,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class SseHub {
 
     static final String FEATURES_EVENT = "features";
+    /** Remote-eval SDKs re-post /api/eval when they get this (the payload itself is never streamed to them). */
+    static final String FEATURES_UPDATED_EVENT = "features-updated";
 
     private final Map<String, Set<Subscriber>> subscribers = new ConcurrentHashMap<>();
     private final AtomicInteger connections = new AtomicInteger();
@@ -80,7 +82,12 @@ public class SseHub {
 
     private void send(Subscriber subscriber, ServedPayload payload, Runnable onFailure) {
         try {
-            subscriber.emitter().send(SseEmitter.event().name(FEATURES_EVENT).data(payload.body(), MediaType.APPLICATION_JSON));
+            if (payload.remoteEval()) {
+                subscriber.emitter().send(SseEmitter.event().name(FEATURES_UPDATED_EVENT)
+                        .data("{\"bundleHash\":\"" + payload.bundleHash() + "\"}", MediaType.APPLICATION_JSON));
+            } else {
+                subscriber.emitter().send(SseEmitter.event().name(FEATURES_EVENT).data(payload.body(), MediaType.APPLICATION_JSON));
+            }
             deliveryRecorder.record(payload.clientKey(), payload.bundleHash(), DeliveryChannel.SSE, subscriber.sdkHint());
         } catch (IOException | IllegalStateException e) {
             log.debug("SSE subscriber for {} is gone: {}", payload.clientKey(), e.getMessage());

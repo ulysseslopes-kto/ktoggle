@@ -46,8 +46,11 @@ public class SdkConnectionController {
         }
         SdkConnection created = sdkConnectionService.create(request.clientKey(), request.name(), request.environmentKey(),
                 request.projectKeys());
-        return Boolean.TRUE.equals(request.encryptPayload())
-                ? sdkConnectionService.update(created.clientKey(), created.name(), created.projectKeys(), true, created.version())
+        boolean encrypt = Boolean.TRUE.equals(request.encryptPayload());
+        boolean remote = Boolean.TRUE.equals(request.remoteEval());
+        return encrypt || remote
+                ? sdkConnectionService.update(created.clientKey(), created.name(), created.projectKeys(), encrypt, remote,
+                        created.version())
                 : created;
     }
 
@@ -57,7 +60,7 @@ public class SdkConnectionController {
             throw ValidationException.of("version is required on update");
         }
         return sdkConnectionService.update(clientKey, request.name(), request.projectKeys(), request.encryptPayload(),
-                request.version());
+                request.remoteEval(), request.version());
     }
 
     @Operation(summary = "Decryption key to configure in this connection's SDKs (admin only)")
