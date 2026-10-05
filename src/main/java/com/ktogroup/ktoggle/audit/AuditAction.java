@@ -13,5 +13,6 @@ public enum AuditAction {
     BYPASS_PUBLISH_DRAFT,
     PUBLISH_BUNDLE,
     ROLLBACK_BUNDLE,
-    UNPIN_BUNDLE
+    UNPIN_BUNDLE,
+    REVOKE
 }

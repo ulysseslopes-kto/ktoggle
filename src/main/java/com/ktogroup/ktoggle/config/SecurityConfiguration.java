@@ -1,5 +1,6 @@
 package com.ktogroup.ktoggle.config;
 
+import com.ktogroup.ktoggle.apitoken.ApiTokenService;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -7,6 +8,7 @@ import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
@@ -17,6 +19,8 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -29,6 +33,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  *   the same contract as the GrowthBook API/Proxy.</li>
  *   <li><b>Admin</b> ({@code /admin/**}): Keycloak JWT. Realm roles {@code ktoggle-viewer} &lt;
  *   {@code ktoggle-editor} &lt; {@code ktoggle-admin}.</li>
+ *   <li><b>Automation</b> ({@code /admin/**}): API tokens ({@code Bearer ktg_...}) with the viewer or editor role.</li>
  * </ul>
  */
 @Configuration
@@ -47,10 +52,17 @@ public class SecurityConfiguration {
             "/admin/v1/attributes/**",
             "/admin/v1/projects/**",
             "/admin/v1/settings/**",
+            "/admin/v1/api-tokens/**",
+    };
+
+    /** Admin-only even for reading: who holds which credential is not for every viewer. */
+    private static final String[] ADMIN_ONLY_READ = {
+            "/admin/v1/api-tokens/**",
     };
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, ApiTokenService apiTokens) throws Exception {
+        DefaultBearerTokenResolver jwtOnly = new DefaultBearerTokenResolver();
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -59,6 +71,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/**", "/sub/**").permitAll()
                         .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(ADMIN_ONLY_READ).hasRole(ADMIN)
                         .requestMatchers(HttpMethod.GET, "/admin/**").hasRole(VIEWER)
                         .requestMatchers(HttpMethod.POST, "/admin/v1/simulate", "/admin/v1/replay/**").hasRole(VIEWER)
                         // Reviewing is governed by the review settings (checked in DraftService), not by the editor role.
@@ -67,7 +80,12 @@ public class SecurityConfiguration {
                         .requestMatchers(ADMIN_ONLY).hasRole(ADMIN)
                         .requestMatchers("/admin/**").hasRole(EDITOR)
                         .anyRequest().denyAll())
-                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakRealmRoles())));
+                .addFilterBefore(new ApiTokenAuthenticationFilter(apiTokens), BearerTokenAuthenticationFilter.class)
+                .oauth2ResourceServer(oauth -> oauth
+                        // API tokens are handled by ApiTokenAuthenticationFilter; only Keycloak JWTs reach the resource server
+                        .bearerTokenResolver(request -> ApiTokenAuthenticationFilter.isApiToken(
+                                request.getHeader(HttpHeaders.AUTHORIZATION)) ? null : jwtOnly.resolve(request))
+                        .jwt(jwt -> jwt.jwtAuthenticationConverter(keycloakRealmRoles())));
         return http.build();
     }
 

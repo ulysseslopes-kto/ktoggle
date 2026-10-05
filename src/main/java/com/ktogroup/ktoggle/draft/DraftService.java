@@ -314,6 +314,9 @@ public class DraftService {
         if (draft.status() != DraftStatus.PENDING_REVIEW) {
             throw new ConflictException(MessageCode.VALIDATION_ERROR, "Only drafts pending review can be reviewed");
         }
+        if (currentUser.isApiToken()) {
+            throw new ForbiddenException(MessageCode.NOT_ALLOWED, "API tokens cannot review drafts; reviews are made by people");
+        }
         if (!policy.canApprove(persistence.reviewSettings(), draft, currentUser.username(), currentUser.roles())) {
             throw new ForbiddenException(MessageCode.NOT_ALLOWED, draft.createdBy().equals(currentUser.username())
                     ? "Authors cannot review their own drafts" : "You are not an approver");
@@ -367,7 +370,8 @@ public class DraftService {
                 persistence.events(draft.id()), new DraftView.Permissions(
                 canEdit,
                 canEdit && (draft.status() == DraftStatus.DRAFT || draft.status() == DraftStatus.CHANGES_REQUESTED),
-                open && draft.status() == DraftStatus.PENDING_REVIEW && policy.canApprove(settings, draft, user, roles),
+                open && draft.status() == DraftStatus.PENDING_REVIEW && !currentUser.isApiToken()
+                        && policy.canApprove(settings, draft, user, roles),
                 canEdit && blockers.isEmpty(),
                 canBypass,
                 open && (draft.createdBy().equals(user) || roles.contains(SecurityConfiguration.ADMIN))),

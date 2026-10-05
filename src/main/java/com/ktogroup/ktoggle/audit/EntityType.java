@@ -8,5 +8,6 @@ public enum EntityType {
     FEATURE,
     SDK_CONNECTION,
     REVIEW_SETTINGS,
-    BUNDLE
+    BUNDLE,
+    API_TOKEN
 }
