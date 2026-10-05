@@ -14,6 +14,7 @@ import com.ktogroup.ktoggle.feature.ExperimentRule;
 import com.ktogroup.ktoggle.feature.ExperimentRule.Variation;
 import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.ForceRule;
+import com.ktogroup.ktoggle.feature.Prerequisite;
 import com.ktogroup.ktoggle.feature.RolloutRule;
 import com.ktogroup.ktoggle.feature.Rule;
 import com.ktogroup.ktoggle.feature.RuleSchedule;
@@ -46,6 +47,58 @@ class GrowthBookSdkContractTest {
     private final GrowthBookEvaluator evaluator = new GrowthBookEvaluator(objectMapper);
     private final SdkConnection prd = new SdkConnection("sdk-test1234", "test", "prd", List.of(), null, null, null, null);
     private static final Instant NOW = Instant.parse("2026-10-05T12:00:00Z");
+
+    @Test
+    void feature_prerequisites_gate_the_whole_feature_on_the_parent_value() {
+        Feature parent = feature("new-wallet", ValueType.BOOLEAN, BooleanNode.FALSE, new EnvironmentSettings(true, List.of(
+                new ForceRule("fr_br", null, true, cond("{\"country\":\"BR\"}"), List.of(), BooleanNode.TRUE))));
+        Feature child = feature("wallet-cashback", ValueType.BOOLEAN, BooleanNode.TRUE, new EnvironmentSettings(true, List.of()))
+                .withPrerequisites(List.of(new Prerequisite("new-wallet", cond("{\"value\": true}"))));
+        ObjectNode payload = compiler.compile(prd, List.of(parent, child), Map.of(), NOW).payload();
+
+        assertThat(sdkIsOn(payload, "wallet-cashback", "{\"country\":\"BR\"}")).as("parent on: child serves its own value").isTrue();
+        assertThat(sdkIsOn(payload, "wallet-cashback", "{\"country\":\"AR\"}")).as("parent off: child is off").isFalse();
+        EvaluationResult gated = evaluator.evaluate(payload, "wallet-cashback", attrs("{\"country\":\"AR\"}"));
+        assertThat(gated.source()).isEqualTo("prerequisite");
+        assertThat(gated.value().isNull()).isTrue();
+        assertThat(gated.trace()).singleElement().satisfies(t -> {
+            assertThat(t.type()).isEqualTo("prerequisite");
+            assertThat(t.conditionMatched()).isFalse();
+        });
+
+        ObjectNode withoutParent = compiler.compile(prd, List.of(parent.withEnvironments(Map.of()), child), Map.of(), NOW).payload();
+        assertThat(sdkIsOn(withoutParent, "wallet-cashback", "{\"country\":\"BR\"}"))
+                .as("a parent that is off in the environment fails closed").isFalse();
+    }
+
+    @Test
+    void live_prerequisite_passes_for_any_served_value_and_fails_when_the_parent_is_absent() {
+        Feature parent = feature("kyc-v2", ValueType.BOOLEAN, BooleanNode.FALSE, new EnvironmentSettings(true, List.of()));
+        Feature child = feature("instant-withdraw", ValueType.BOOLEAN, BooleanNode.TRUE, new EnvironmentSettings(true, List.of()))
+                .withPrerequisites(List.of(new Prerequisite("kyc-v2", cond("{\"value\": {\"$exists\": true}}"))));
+
+        assertThat(sdkIsOn(compiler.compile(prd, List.of(parent, child), Map.of(), NOW).payload(), "instant-withdraw", "{}"))
+                .as("parent live (even with value false)").isTrue();
+        assertThat(sdkIsOn(compiler.compile(prd, List.of(parent.withArchived(true), child), Map.of(), NOW).payload(),
+                "instant-withdraw", "{}")).as("parent not live").isFalse();
+    }
+
+    @Test
+    void rule_prerequisites_only_skip_the_rule() {
+        Feature parent = feature("vip-program", ValueType.BOOLEAN, BooleanNode.FALSE, new EnvironmentSettings(true, List.of(
+                new ForceRule("fr_vip", null, true, cond("{\"vip\":true}"), List.of(), BooleanNode.TRUE))));
+        Rule dependent = new ForceRule("fr_gold", null, true, null, List.of(), TextNode.valueOf("gold"), null,
+                List.of(new Prerequisite("vip-program", cond("{\"value\": true}"))));
+        Rule fallback = new ForceRule("fr_all", null, true, null, List.of(), TextNode.valueOf("silver"));
+        Feature child = feature("lobby-theme", ValueType.STRING, TextNode.valueOf("std"),
+                new EnvironmentSettings(true, List.of(dependent, fallback)));
+        ObjectNode payload = compiler.compile(prd, List.of(parent, child), Map.of(), NOW).payload();
+
+        assertThat(payload.path("features").path("lobby-theme").path("rules").get(0).path("parentConditions").get(0).has("gate"))
+                .isFalse();
+        assertThat(sdkValue(payload, "lobby-theme", "{\"vip\":true}")).isEqualTo("gold");
+        assertThat(sdkValue(payload, "lobby-theme", "{\"vip\":false}")).as("falls through to the next rule").isEqualTo("silver");
+    }
 
     @Test
     void scheduled_rules_are_served_only_inside_their_window() {

@@ -26,7 +26,8 @@ import org.springframework.stereotype.Component;
 public class DraftMerger {
 
     static final String ENVIRONMENT_PREFIX = "environments.";
-    private static final List<String> FIELDS = List.of("defaultValue", "projectKey", "description", "owner", "tags", "archived");
+    private static final List<String> FIELDS = List.of("defaultValue", "projectKey", "description", "owner", "tags", "archived",
+            "prerequisites");
 
     private final ObjectMapper objectMapper;
 

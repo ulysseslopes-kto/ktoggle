@@ -19,9 +19,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReviewPolicy {
 
+    /** Sections that change what SDKs get in every environment where the feature is enabled. */
+    private static final Set<String> GLOBAL_SECTIONS = Set.of("defaultValue", "archived", "prerequisites");
+
     /**
      * Environments whose SDK payload would change: environments with changed settings, plus — for changes to the
-     * default value or archiving — every environment where the feature is enabled (live or after publishing).
+     * default value, prerequisites or archiving — every environment where the feature is enabled (live or after publishing).
      */
     public Set<String> affectedEnvironments(MergeResult merge, Map<String, EnvironmentSettings> live) {
         Set<String> affected = new TreeSet<>();
@@ -29,7 +32,7 @@ public class ReviewPolicy {
         for (SectionChange change : merge.changes()) {
             if (change.environment() != null) {
                 affected.add(change.environment());
-            } else if ("defaultValue".equals(change.section()) || "archived".equals(change.section())) {
+            } else if (GLOBAL_SECTIONS.contains(change.section())) {
                 global = true;
             }
         }

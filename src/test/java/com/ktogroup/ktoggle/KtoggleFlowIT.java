@@ -279,6 +279,46 @@ class KtoggleFlowIT {
     }
 
     @Test
+    void prerequisites_are_edited_in_drafts_gate_the_child_and_reject_cycles() throws Exception {
+        Setup s = setup();
+        Fixtures fixtures = new Fixtures(admin);
+        String parent = unique("parent");
+        admin.postJson("/admin/v1/features", Map.of("key", parent, "valueType", "BOOLEAN", "defaultValue", false), 201);
+        fixtures.publishEnvironment(parent, s.environment(), true,
+                List.of(Map.of("type", "force", "enabled", true, "condition", Map.of("country", "BR"), "value", true)));
+        fixtures.publishEnvironment(s.feature(), s.environment(), true,
+                List.of(Map.of("type", "force", "enabled", true, "value", true)));
+
+        JsonNode draft = fixtures.draft(s.feature());
+        JsonNode updated = admin.putJson("/admin/v1/drafts/" + draft.path("id").asText() + "/prerequisites",
+                Map.of("version", draft.path("version").asLong(),
+                        "prerequisites", List.of(Map.of("featureKey", parent, "condition", Map.of("value", true)))), 200);
+        fixtures.publish(updated);
+
+        JsonNode body = fetch(s.clientKey()).body();
+        assertThat(sdkIsOn(body, s.feature(), "{\"country\":\"BR\"}")).isTrue();
+        assertThat(sdkIsOn(body, s.feature(), "{\"country\":\"AR\"}")).as("gated by the parent").isFalse();
+        JsonNode simulated = admin.postJson("/admin/v1/simulate", Map.of("featureKey", s.feature(), "environmentKey", s.environment(),
+                "attributes", Map.of("country", "AR")), 200);
+        assertThat(simulated.path("source").asText()).isEqualTo("prerequisite");
+
+        JsonNode dependents = admin.getJson("/admin/v1/features/" + parent + "/dependents");
+        assertThat(dependents).singleElement().satisfies(d -> {
+            assertThat(d.path("featureKey").asText()).isEqualTo(s.feature());
+            assertThat(d.path("featureLevel").asBoolean()).isTrue();
+        });
+
+        JsonNode parentDraft = fixtures.draft(parent);
+        JsonNode cycle = admin.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .put("/admin/v1/drafts/" + parentDraft.path("id").asText() + "/prerequisites")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("version", parentDraft.path("version").asLong(),
+                                "prerequisites", List.of(Map.of("featureKey", s.feature(), "condition", Map.of("value", true)))))), 400)
+                .getResponse().getContentAsString().transform(this::readTree);
+        assertThat(cycle.path("message").asText()).contains("Circular prerequisite");
+    }
+
+    @Test
     void invalid_rules_are_rejected_with_details() throws Exception {
         Setup s = setup();
         JsonNode draft = new Fixtures(admin).draft(s.feature());

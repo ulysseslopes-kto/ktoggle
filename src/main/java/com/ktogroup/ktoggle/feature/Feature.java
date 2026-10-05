@@ -22,6 +22,7 @@ public record Feature(
         String owner,
         List<String> tags,
         boolean archived,
+        List<Prerequisite> prerequisites,
         Map<String, EnvironmentSettings> environments,
         int revision,
         Instant createdAt,
@@ -32,7 +33,15 @@ public record Feature(
 
     public Feature {
         tags = tags == null ? List.of() : List.copyOf(tags);
+        prerequisites = Prerequisite.normalize(prerequisites);
         environments = environments == null ? Map.of() : Collections.unmodifiableMap(new TreeMap<>(environments));
+    }
+
+    public Feature(String key, String projectKey, ValueType valueType, JsonNode defaultValue, String description, String owner,
+                   List<String> tags, boolean archived, Map<String, EnvironmentSettings> environments, int revision,
+                   Instant createdAt, String createdBy, Instant updatedAt, String updatedBy, Long version) {
+        this(key, projectKey, valueType, defaultValue, description, owner, tags, archived, List.of(), environments, revision,
+                createdAt, createdBy, updatedAt, updatedBy, version);
     }
 
     public EnvironmentSettings environment(String environmentKey) {
@@ -41,6 +50,7 @@ public record Feature(
 
     /** The versionable content of the feature (what a revision snapshot captures). */
     public FeatureSnapshot snapshot() {
-        return new FeatureSnapshot(key, projectKey, valueType, defaultValue, description, owner, tags, archived, environments);
+        return new FeatureSnapshot(key, projectKey, valueType, defaultValue, description, owner, tags, archived, prerequisites,
+                environments);
     }
 }

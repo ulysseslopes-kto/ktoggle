@@ -1,5 +1,6 @@
 package com.ktogroup.ktoggle.feature;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 
@@ -15,22 +16,25 @@ import java.util.List;
  */
 public record ExperimentRule(String id, String description, boolean enabled, JsonNode condition, List<String> savedGroups,
                              String trackingKey, String hashAttribute, double coverage, List<Variation> variations,
-                             int hashVersion, String seed, RuleSchedule schedule) implements Rule {
+                             int hashVersion, String seed, RuleSchedule schedule, List<Prerequisite> prerequisites)
+        implements Rule {
 
     public static final int DEFAULT_HASH_VERSION = 2;
 
+    @JsonCreator
     public ExperimentRule {
         savedGroups = savedGroups == null ? List.of() : List.copyOf(savedGroups);
         variations = variations == null ? List.of() : List.copyOf(variations);
         hashVersion = hashVersion == 0 ? DEFAULT_HASH_VERSION : hashVersion;
         schedule = Rule.normalize(schedule);
+        prerequisites = Prerequisite.normalize(prerequisites);
     }
 
     public ExperimentRule(String id, String description, boolean enabled, JsonNode condition, List<String> savedGroups,
                           String trackingKey, String hashAttribute, double coverage, List<Variation> variations,
                           int hashVersion, String seed) {
         this(id, description, enabled, condition, savedGroups, trackingKey, hashAttribute, coverage, variations, hashVersion,
-                seed, null);
+                seed, null, null);
     }
 
     /** The control (first variation) value — used where a single representative value is needed. */
@@ -42,7 +46,7 @@ public record ExperimentRule(String id, String description, boolean enabled, Jso
     @Override
     public Rule withId(String newId) {
         return new ExperimentRule(newId, description, enabled, condition, savedGroups, trackingKey, hashAttribute, coverage,
-                variations, hashVersion, seed, schedule);
+                variations, hashVersion, seed, schedule, prerequisites);
     }
 
     /**

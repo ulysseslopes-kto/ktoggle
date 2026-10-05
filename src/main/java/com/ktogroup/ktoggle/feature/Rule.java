@@ -34,6 +34,9 @@ public sealed interface Rule permits ForceRule, RolloutRule, ExperimentRule {
 
     Rule withId(String newId);
 
+    /** Features this rule depends on (all must pass); when unmet, the rule is skipped. */
+    List<Prerequisite> prerequisites();
+
     /** Optional time window; null when the rule is always live (while enabled). */
     RuleSchedule schedule();
 

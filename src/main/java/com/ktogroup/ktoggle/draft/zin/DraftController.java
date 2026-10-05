@@ -7,6 +7,7 @@ import com.ktogroup.ktoggle.draft.DraftService.DraftView;
 import com.ktogroup.ktoggle.draft.DraftStatus;
 import com.ktogroup.ktoggle.draft.FeatureDraft;
 import com.ktogroup.ktoggle.draft.ReviewSettings;
+import com.ktogroup.ktoggle.feature.Prerequisite;
 import com.ktogroup.ktoggle.feature.Rule;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -88,6 +89,12 @@ public class DraftController {
                 request.owner(), request.tags(), request.archived(), request.version());
     }
 
+    @Operation(summary = "Feature-level prerequisites: the feature is off (null) unless every parent condition passes")
+    @PutMapping("/drafts/{id}/prerequisites")
+    public FeatureDraft updatePrerequisites(@PathVariable UUID id, @Valid @RequestBody PrerequisitesRequest request) {
+        return draftService.updatePrerequisites(id, request.prerequisites(), request.version());
+    }
+
     @PutMapping("/drafts/{id}/title")
     public FeatureDraft rename(@PathVariable UUID id, @Valid @RequestBody TitleRequest request) {
         return draftService.rename(id, request.title(), request.version() == null ? -1 : request.version());
@@ -152,6 +159,9 @@ public class DraftController {
 
     public record MetadataRequest(String projectKey, @NotNull JsonNode defaultValue, String description, String owner,
                                   List<String> tags, boolean archived, @NotNull Long version) {
+    }
+
+    public record PrerequisitesRequest(List<Prerequisite> prerequisites, @NotNull Long version) {
     }
 
     public record VersionRequest(@NotNull Long version) {

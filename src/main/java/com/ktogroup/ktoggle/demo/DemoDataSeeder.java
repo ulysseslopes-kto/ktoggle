@@ -8,11 +8,13 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.ktogroup.ktoggle.attribute.AttributeDatatype;
 import com.ktogroup.ktoggle.attribute.AttributeService;
 import com.ktogroup.ktoggle.attribute.AttributeService.AttributeCommand;
+import com.ktogroup.ktoggle.audit.AuditAction;
 import com.ktogroup.ktoggle.environment.EnvironmentService;
 import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.FeatureService;
 import com.ktogroup.ktoggle.feature.ExperimentRule;
 import com.ktogroup.ktoggle.feature.ForceRule;
+import com.ktogroup.ktoggle.feature.Prerequisite;
 import com.ktogroup.ktoggle.feature.RolloutRule;
 import com.ktogroup.ktoggle.feature.Rule;
 import com.ktogroup.ktoggle.feature.RuleSchedule;
@@ -132,6 +134,12 @@ public class DemoDataSeeder {
                 List.of("experiment", "conversion"),
                 "prd", List.of(depositCopyExperiment(0.5)),
                 "stg", List.of(depositCopyExperiment(1.0)));
+        // only for users who already get the new checkout (feature-level prerequisite)
+        feature("instant-cashback", "payments", ValueType.BOOLEAN, BooleanNode.TRUE, "Instant cashback on deposits",
+                List.of("checkout", "bonus"), "prd", List.of(), "stg", List.of());
+        Feature cashback = features.get("instant-cashback");
+        features.publish(cashback.key(), cashback.snapshot().withPrerequisites(
+                List.of(new Prerequisite("new-checkout", json("{\"value\": true}")))), AuditAction.UPDATE);
         features.create("dark-mode", null, ValueType.BOOLEAN, BooleanNode.FALSE, "Dark theme in the app (still in development)",
                 "squad-app", List.of("ux"));
     }

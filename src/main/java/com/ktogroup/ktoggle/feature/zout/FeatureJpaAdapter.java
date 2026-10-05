@@ -10,6 +10,7 @@ import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.FeaturePersistencePort;
 import com.ktogroup.ktoggle.feature.FeatureRevision;
 import com.ktogroup.ktoggle.feature.FeatureSnapshot;
+import com.ktogroup.ktoggle.feature.Prerequisite;
 import com.ktogroup.ktoggle.feature.Rule;
 import java.io.IOException;
 import java.util.HashMap;
@@ -25,6 +26,8 @@ import org.springframework.stereotype.Component;
 public class FeatureJpaAdapter implements FeaturePersistencePort {
 
     private static final TypeReference<List<Rule>> RULES = new TypeReference<>() {
+    };
+    private static final TypeReference<List<Prerequisite>> PREREQUISITES = new TypeReference<>() {
     };
 
     private final FeatureJpaRepository repository;
@@ -73,6 +76,7 @@ public class FeatureJpaAdapter implements FeaturePersistencePort {
         entity.setOwner(feature.owner());
         entity.setTags(feature.tags());
         entity.setArchived(feature.archived());
+        entity.setPrerequisites(objectMapper.valueToTree(feature.prerequisites()));
         entity.setRevision(feature.revision());
         entity.setUpdatedAt(feature.updatedAt());
         entity.setUpdatedBy(feature.updatedBy());
@@ -130,7 +134,8 @@ public class FeatureJpaAdapter implements FeaturePersistencePort {
         e.getEnvironments().forEach(env ->
                 environments.put(env.getEnvironmentKey(), new EnvironmentSettings(env.isEnabled(), rules(env.getRules()))));
         return new Feature(e.getKey(), e.getProjectKey(), e.getValueType(), e.getDefaultValue(), e.getDescription(),
-                e.getOwner(), e.getTags(), e.isArchived(), environments, e.getRevision(), e.getCreatedAt(),
+                e.getOwner(), e.getTags(), e.isArchived(), prerequisites(e.getPrerequisites()), environments, e.getRevision(),
+                e.getCreatedAt(),
                 e.getCreatedBy(), e.getUpdatedAt(), e.getUpdatedBy(), e.getVersion());
     }
 
@@ -161,6 +166,17 @@ public class FeatureJpaAdapter implements FeaturePersistencePort {
             return objectMapper.readerFor(RULES).readValue(json);
         } catch (IOException ex) {
             throw new IllegalStateException("Corrupted rules JSON", ex);
+        }
+    }
+
+    private List<Prerequisite> prerequisites(JsonNode json) {
+        if (json == null || json.isEmpty()) {
+            return List.of();
+        }
+        try {
+            return objectMapper.readerFor(PREREQUISITES).readValue(json);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Corrupted prerequisites JSON", ex);
         }
     }
 }

@@ -55,6 +55,10 @@ public class FeatureEntity {
     @Column(nullable = false)
     private boolean archived;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false)
+    private JsonNode prerequisites;
+
     @Column(nullable = false)
     private int revision;
 

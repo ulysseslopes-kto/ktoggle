@@ -27,6 +27,7 @@ import com.ktogroup.ktoggle.commons.time.Ids;
 import com.ktogroup.ktoggle.environment.EnvironmentService;
 import com.ktogroup.ktoggle.project.ProjectService;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupService;
+import com.ktogroup.ktoggle.targeting.ConditionValidator;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -53,7 +54,8 @@ class FeatureServiceTest {
     private final ChangeContextProvider changeContextProvider = mock(ChangeContextProvider.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final ChangeContext context = new ChangeContext(Ids.newId(), "alice", "because");
-    private final FeatureService service = new FeatureService(persistence, ruleValidator, projectService, environmentService,
+    private final FeatureService service = new FeatureService(persistence, ruleValidator,
+            new PrerequisiteValidator(new ConditionValidator()), projectService, environmentService,
             attributeService, savedGroupService, auditService, changeContextProvider, events, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @BeforeEach

@@ -17,6 +17,7 @@ import com.ktogroup.ktoggle.savedgroup.SavedGroupService;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,11 @@ public class EvaluationService {
             feature = feature.withEnvironments(environments);
         }
         SdkConnection virtual = new SdkConnection("simulation", "simulation", environmentKey, List.of(), null, null, null, null);
-        var compiled = compiler.compile(virtual, List.of(feature), savedGroupService.findAllByKey(),
+        // every other feature too: prerequisites evaluate their parents from the same payload
+        String key = feature.key();
+        List<Feature> features = new ArrayList<>(featureService.findAllActive().stream().filter(f -> !f.key().equals(key)).toList());
+        features.add(feature);
+        var compiled = compiler.compile(virtual, features, savedGroupService.findAllByKey(),
                 at == null ? Ids.now(clock) : at);
         return evaluator.evaluate(compiled.payload(), featureKey, attributes);
     }

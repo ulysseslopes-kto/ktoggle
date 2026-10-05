@@ -22,6 +22,7 @@ import com.ktogroup.ktoggle.feature.EnvironmentSettings;
 import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.FeatureService;
 import com.ktogroup.ktoggle.feature.FeatureSnapshot;
+import com.ktogroup.ktoggle.feature.Prerequisite;
 import com.ktogroup.ktoggle.feature.Rule;
 import java.time.Clock;
 import java.time.Instant;
@@ -105,7 +106,8 @@ public class DraftService {
         }
         Map<String, EnvironmentSettings> environments = new HashMap<>(draft.proposed().environments());
         environments.put(environmentKey, new EnvironmentSettings(enabled, rules));
-        FeatureSnapshot proposed = featureService.validate(draft.proposed().valueType(), withEnvironments(draft.proposed(), environments));
+        FeatureSnapshot proposed = featureService.validate(draft.proposed().valueType(),
+                draft.proposed().withEnvironments(environments));
         return touch(draft, proposed, "Environment %s: %s, %d rule(s)".formatted(environmentKey, enabled ? "on" : "off",
                 proposed.environments().get(environmentKey).rules().size()));
     }
@@ -116,8 +118,17 @@ public class DraftService {
         FeatureDraft draft = editable(id, version);
         FeatureSnapshot p = draft.proposed();
         FeatureSnapshot proposed = featureService.validate(p.valueType(), new FeatureSnapshot(p.key(), projectKey, p.valueType(),
-                defaultValue, description, owner, tags == null ? List.of() : tags, archived, p.environments()));
+                defaultValue, description, owner, tags == null ? List.of() : tags, archived, p.prerequisites(), p.environments()));
         return touch(draft, proposed, "General settings changed");
+    }
+
+    @Transactional
+    public FeatureDraft updatePrerequisites(UUID id, List<Prerequisite> prerequisites, long version) {
+        FeatureDraft draft = editable(id, version);
+        FeatureSnapshot proposed = featureService.validate(draft.proposed().valueType(),
+                draft.proposed().withPrerequisites(Prerequisite.normalize(prerequisites)));
+        return touch(draft, proposed, proposed.prerequisites().isEmpty() ? "Prerequisites removed"
+                : "Prerequisites: " + String.join(", ", proposed.prerequisites().stream().map(Prerequisite::featureKey).toList()));
     }
 
     @Transactional
@@ -363,10 +374,6 @@ public class DraftService {
                 blockers);
     }
 
-    private static FeatureSnapshot withEnvironments(FeatureSnapshot s, Map<String, EnvironmentSettings> environments) {
-        return new FeatureSnapshot(s.key(), s.projectKey(), s.valueType(), s.defaultValue(), s.description(), s.owner(),
-                s.tags(), s.archived(), environments);
-    }
 
     /**
      * Everything the UI needs to review a draft.

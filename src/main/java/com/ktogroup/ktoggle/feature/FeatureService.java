@@ -41,6 +41,7 @@ public class FeatureService {
 
     private final FeaturePersistencePort persistence;
     private final RuleValidator ruleValidator;
+    private final PrerequisiteValidator prerequisiteValidator;
     private final ProjectService projectService;
     private final EnvironmentService environmentService;
     private final AttributeService attributeService;
@@ -53,6 +54,33 @@ public class FeatureService {
     @Transactional(readOnly = true)
     public List<Feature> findAll(FeatureFilter filter) {
         return persistence.findAll(filter);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Feature> findAllActive() {
+        return persistence.findAllActive();
+    }
+
+    /** Active features that depend on {@code key}, at feature level or in any rule — what turning it off affects. */
+    @Transactional(readOnly = true)
+    public List<Dependent> dependents(String key) {
+        get(key);
+        return persistence.findAllActive().stream()
+                .filter(feature -> PrerequisiteValidator.parents(feature.snapshot()).contains(key))
+                .map(feature -> new Dependent(feature.key(),
+                        feature.prerequisites().stream().anyMatch(p -> p.featureKey().equals(key)),
+                        feature.environments().entrySet().stream()
+                                .filter(e -> e.getValue().rules().stream()
+                                        .anyMatch(r -> r.prerequisites().stream().anyMatch(p -> p.featureKey().equals(key))))
+                                .map(Map.Entry::getKey).sorted().toList()))
+                .toList();
+    }
+
+    /**
+     * @param featureLevel    the whole feature depends on it
+     * @param ruleEnvironments environments with at least one rule depending on it
+     */
+    public record Dependent(String featureKey, boolean featureLevel, List<String> ruleEnvironments) {
     }
 
     @Transactional(readOnly = true)
@@ -142,7 +170,8 @@ public class FeatureService {
 
     /**
      * Validates a whole snapshot against today's catalog (project, environments, attributes, saved groups, value
-     * type) and returns it normalized (missing rule ids assigned). Used for drafts before they can be published.
+     * type, prerequisite features) and returns it normalized (missing rule ids assigned). Used for drafts before they
+     * can be published.
      */
     @Transactional(readOnly = true)
     public FeatureSnapshot validate(ValueType valueType, FeatureSnapshot snapshot) {
@@ -156,8 +185,13 @@ public class FeatureService {
             environments.put(env, new EnvironmentSettings(settings.enabled(),
                     ruleValidator.validate(valueType, settings.rules(), attributes, groups)));
         });
-        return new FeatureSnapshot(snapshot.key(), snapshot.projectKey(), valueType, snapshot.defaultValue(),
-                snapshot.description(), snapshot.owner(), snapshot.tags(), snapshot.archived(), environments);
+        FeatureSnapshot validated = new FeatureSnapshot(snapshot.key(), snapshot.projectKey(), valueType, snapshot.defaultValue(),
+                snapshot.description(), snapshot.owner(), snapshot.tags(), snapshot.archived(), snapshot.prerequisites(),
+                environments);
+        Map<String, Feature> features = new HashMap<>();
+        persistence.findAllActive().forEach(feature -> features.put(feature.key(), feature));
+        prerequisiteValidator.validate(snapshot.key(), validated, features);
+        return validated;
     }
 
     /**
@@ -173,7 +207,8 @@ public class FeatureService {
     private Feature apply(Feature current, FeatureSnapshot snapshot, AuditAction action) {
         Feature next = current.withProjectKey(snapshot.projectKey()).withDefaultValue(snapshot.defaultValue())
                 .withDescription(snapshot.description()).withOwner(snapshot.owner()).withTags(snapshot.tags())
-                .withArchived(snapshot.archived()).withEnvironments(snapshot.environments());
+                .withArchived(snapshot.archived()).withPrerequisites(snapshot.prerequisites())
+                .withEnvironments(snapshot.environments());
         return commit(changeContextProvider.current(), current, next, action);
     }
 

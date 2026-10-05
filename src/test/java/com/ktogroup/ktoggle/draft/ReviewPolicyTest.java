@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.ktogroup.ktoggle.draft.DraftMerger.MergeResult;
 import com.ktogroup.ktoggle.draft.DraftMerger.SectionChange;
 import com.ktogroup.ktoggle.environment.Environment;
@@ -35,6 +36,15 @@ class ReviewPolicyTest {
 
         assertThat(policy.affectedEnvironments(merge, Map.of("prd", on(), "stg", new EnvironmentSettings(false, List.of()))))
                 .containsExactlyInAnyOrder("prd", "dev");
+    }
+
+    @Test
+    void prerequisites_affect_every_enabled_environment() {
+        MergeResult merge = merge(Map.of(), new SectionChange("prerequisites",
+                JsonNodeFactory.instance.arrayNode(),
+                JsonNodeFactory.instance.arrayNode().add("x")));
+
+        assertThat(policy.affectedEnvironments(merge, Map.of("prd", on()))).containsExactly("prd");
     }
 
     @Test

@@ -54,6 +54,12 @@ public class FeatureController {
                 request.description(), request.owner(), request.tags());
     }
 
+    @Operation(summary = "Features that depend on this one through prerequisites")
+    @GetMapping("/{key}/dependents")
+    public List<FeatureService.Dependent> dependents(@PathVariable String key) {
+        return featureService.dependents(key);
+    }
+
     @GetMapping("/{key}/revisions")
     public List<FeatureRevision> revisions(@PathVariable String key) {
         return featureService.revisions(key);

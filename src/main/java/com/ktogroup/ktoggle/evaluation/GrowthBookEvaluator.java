@@ -56,14 +56,38 @@ public class GrowthBookEvaluator {
         List<EvaluationResult.RuleTrace> trace = new ArrayList<>();
         for (JsonNode rule : features.path(featureKey).path("rules")) {
             String id = rule.path("id").asText(null);
-            boolean matched = !rule.hasNonNull("condition")
-                    || Boolean.TRUE.equals(growthBook.evaluateCondition(attributesJson, write(rule.get("condition"))));
-            trace.add(new EvaluationResult.RuleTrace(id, rule.has("variations") ? "experiment" : rule.has("coverage") ? "rollout" : "force", matched,
-                    id != null && id.equals(ruleId)));
+            boolean matched = (!rule.hasNonNull("condition")
+                    || Boolean.TRUE.equals(growthBook.evaluateCondition(attributesJson, write(rule.get("condition")))))
+                    && parentsPass(growthBook, rule.path("parentConditions"));
+            trace.add(new EvaluationResult.RuleTrace(id, type(rule), matched, id != null && id.equals(ruleId)));
         }
         String source = result.getSource() == null ? null : result.getSource().toString();
         return new EvaluationResult(featureKey, toJson(result.getValue()), source, ruleId, Evaluators.REFERENCE_EVALUATOR,
                 List.copyOf(trace), assignment(result));
+    }
+
+    private static String type(JsonNode rule) {
+        if (isGate(rule)) {
+            return "prerequisite";
+        }
+        return rule.has("variations") ? "experiment" : rule.has("coverage") ? "rollout" : "force";
+    }
+
+    /** The leading rule compiled from feature-level prerequisites (it never serves a value itself). */
+    private static boolean isGate(JsonNode rule) {
+        return !rule.has("force") && !rule.has("variations") && rule.path("parentConditions").path(0).path("gate").asBoolean(false);
+    }
+
+    /** Same check the SDK runs: each parent's value for this user against {@code {"value": ...}}. */
+    private boolean parentsPass(GrowthBook growthBook, JsonNode parents) {
+        for (JsonNode parent : parents) {
+            ObjectNode subject = objectMapper.createObjectNode();
+            subject.set("value", toJson(growthBook.evalFeature(parent.path("id").asText(), Object.class).getValue()));
+            if (!Boolean.TRUE.equals(growthBook.evaluateCondition(write(subject), write(parent.path("condition"))))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static EvaluationResult.ExperimentAssignment assignment(FeatureResult<Object> result) {
