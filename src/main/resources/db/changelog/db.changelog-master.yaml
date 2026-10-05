@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/0001-catalog.sql
+  - include:
+      file: db/changelog/changes/0002-features.sql
+  - include:
+      file: db/changelog/changes/0003-audit.sql
+  - include:
+      file: db/changelog/changes/0004-bundles.sql
+  - include:
+      file: db/changelog/changes/0005-decisions.sql
+  - include:
+      file: db/changelog/changes/0006-shedlock.sql
+  - include:
+      file: db/changelog/changes/0007-drafts.sql

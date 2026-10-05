@@ -1,0 +1,117 @@
+{
+  "realm": "mobilt",
+  "enabled": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      {
+        "name": "ktoggle-viewer",
+        "description": "Read flags, audit, bundles; simulate and replay"
+      },
+      {
+        "name": "ktoggle-editor",
+        "description": "Viewer + create/edit features and saved groups"
+      },
+      {
+        "name": "ktoggle-admin",
+        "description": "Editor + environments, attributes, projects, SDK connections, rollbacks"
+      },
+      {
+        "name": "ktoggle-approver",
+        "description": "Pode aprovar drafts (quando listado nas configurações de revisão)"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ktoggle-ui",
+      "name": "ktoggle admin UI (local)",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin.local",
+      "enabled": true,
+      "email": "admin.local@ktoggle.test",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "Local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ktoggle-admin"
+      ]
+    },
+    {
+      "username": "editor.local",
+      "enabled": true,
+      "email": "editor.local@ktoggle.test",
+      "emailVerified": true,
+      "firstName": "Editor",
+      "lastName": "Local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "editor",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ktoggle-editor"
+      ]
+    },
+    {
+      "username": "viewer.local",
+      "enabled": true,
+      "email": "viewer.local@ktoggle.test",
+      "emailVerified": true,
+      "firstName": "Viewer",
+      "lastName": "Local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ktoggle-viewer"
+      ]
+    },
+    {
+      "username": "approver.local",
+      "enabled": true,
+      "email": "approver.local@ktoggle.test",
+      "emailVerified": true,
+      "firstName": "Approver",
+      "lastName": "Local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "approver",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ktoggle-approver"
+      ]
+    }
+  ]
+}

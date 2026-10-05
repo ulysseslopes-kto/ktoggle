@@ -1,0 +1,24 @@
+name: CI
+
+# Build + tests only (unit, integration on embedded PostgreSQL, ArchUnit, JaCoCo gate).
+# No image publishing and no deployment: ktoggle is not deployed anywhere yet.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - name: Build and test
+        run: ./mvnw -B clean verify

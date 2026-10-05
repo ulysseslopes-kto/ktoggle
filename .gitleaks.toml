@@ -1,0 +1,17 @@
+# Gitleaks config — ktoggle
+# Extends the default Gitleaks rules and adds an allowlist of non-secrets.
+title = "ktoggle"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Disposable local-dev material"
+paths = [
+  # LOCAL Keycloak realm import (docker-compose) — disposable users, not used in stg/prd.
+  '''local-infra/keycloak/.*''',
+  # LOCAL profile: dev-only bundle signing keypair and digest secret (stg/prd use KMS + Secrets Manager).
+  '''src/main/resources/application-local\.properties''',
+  # Test profile: fixed digest secret for deterministic tests.
+  '''src/test/resources/application-test\.properties''',
+]

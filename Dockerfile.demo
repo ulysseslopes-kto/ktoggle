@@ -1,0 +1,18 @@
+# Self-contained image for local demos: builds the jar inside Docker, so only Docker is needed.
+# (The regular Dockerfile packages a jar built by CI.) Used by `docker compose --profile app up`.
+FROM docker.io/library/maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /src
+COPY pom.xml .
+RUN mvn -q -B dependency:go-offline
+COPY src ./src
+RUN mvn -q -B package -Dmaven.test.skip=true -Dmaven.gitcommitid.skip=true -Djacoco.skip=true \
+    && java -Djarmode=tools -jar target/ktoggle.jar extract --layers --launcher --destination /out
+
+FROM docker.io/library/eclipse-temurin:21-jre-noble
+WORKDIR /application
+COPY --from=build /out/dependencies ./
+COPY --from=build /out/spring-boot-loader ./
+COPY --from=build /out/snapshot-dependencies ./
+COPY --from=build /out/application ./
+EXPOSE 8090
+CMD ["java", "org.springframework.boot.loader.launch.JarLauncher"]

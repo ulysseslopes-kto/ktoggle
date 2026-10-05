@@ -1,0 +1,33 @@
+name: Gitleaks
+
+# Em PR: escaneia apenas os commits introduzidos pelo PR (segredo NOVO barra o merge);
+# o legado já existente vira backlog de remediação e não deixa o CI vermelho.
+# workflow_dispatch: roda um scan do histórico completo, sob demanda (útil p/ auditoria).
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks (PR diff)
+        if: github.event_name == 'pull_request'
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source=/repo --config=/repo/.gitleaks.toml --redact --no-banner -v \
+            --log-opts="--no-merges ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+
+      - name: Gitleaks (histórico completo)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            detect --source=/repo --config=/repo/.gitleaks.toml --redact --no-banner -v

@@ -1,0 +1,6 @@
+# SDKMAN! environment for ktoggle.
+# Pins the Java version used to build/test this service so it matches CI
+# (GitHub Actions uses Temurin 21). Run `sdk env` (or `sdk env install`)
+# in the project root to switch automatically. Enable auto-switching with:
+#   sdk config  ->  set sdkman_auto_env=true
+java=21.0.8-tem

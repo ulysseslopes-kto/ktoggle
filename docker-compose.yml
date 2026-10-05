@@ -1,0 +1,87 @@
+# ktoggle local stack.
+#
+#   Full demo, only Docker needed (expects ../ktoggle-ui next to this repository):
+#     docker compose --profile app up -d --build        → UI http://localhost:5173 (admin.local / admin)
+#
+#   Development (infrastructure only; run the backend and UI from your IDE / npm):
+#     docker compose up -d
+#     ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,demo
+#
+# Keycloak admin console: http://localhost:8180 (admin/admin). Dev users: see local-infra/keycloak/README.md.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ktoggle
+      POSTGRES_USER: ktoggle
+      POSTGRES_PASSWORD: ktoggle
+    ports:
+      - "5434:5432"
+    volumes:
+      - ktoggle-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ktoggle"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6390:6379"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm", "--http-port=8180", "--health-enabled=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Tokens always carry iss=http://localhost:8180, whether Keycloak is reached by the browser or by containers.
+      KC_HOSTNAME: http://localhost:8180
+    ports:
+      - "8180:8180"
+    volumes:
+      - ./local-infra/keycloak/mobilt-realm.json:/opt/keycloak/data/import/mobilt-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      retries: 30
+
+  ktoggle:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      keycloak:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local,demo
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ktoggle
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      # Issuer as seen by the browser; signing keys fetched over the compose network.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8180/realms/mobilt
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8180/realms/mobilt/protocol/openid-connect/certs
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8090 && printf 'GET /actuator/health HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      retries: 30
+
+  ktoggle-ui:
+    profiles: [app]
+    build:
+      context: ../ktoggle-ui
+    depends_on:
+      ktoggle:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+
+volumes:
+  ktoggle-postgres:
