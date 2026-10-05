@@ -40,7 +40,8 @@ public class ProjectController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Project create(@Valid @RequestBody ProjectRequest request) {
-        return projectService.create(request.key(), request.name(), request.description());
+        return projectService.create(request.key(), request.name(), request.description(), request.editorRoles(),
+                request.editorUsers());
     }
 
     @PutMapping("/{key}")
@@ -48,7 +49,8 @@ public class ProjectController {
         if (request.version() == null) {
             throw ValidationException.of("version is required on update");
         }
-        return projectService.update(key, request.name(), request.description(), request.version());
+        return projectService.update(key, request.name(), request.description(), request.editorRoles(), request.editorUsers(),
+                request.version());
     }
 
     @DeleteMapping("/{key}")

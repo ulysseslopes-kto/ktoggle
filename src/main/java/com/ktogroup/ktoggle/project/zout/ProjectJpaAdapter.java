@@ -41,6 +41,8 @@ public class ProjectJpaAdapter implements ProjectPersistencePort {
         });
         entity.setName(project.name());
         entity.setDescription(project.description());
+        entity.setEditorRoles(project.editorRoles());
+        entity.setEditorUsers(project.editorUsers());
         entity.setUpdatedAt(project.updatedAt());
         return toDomain(repository.saveAndFlush(entity));
     }
@@ -56,6 +58,7 @@ public class ProjectJpaAdapter implements ProjectPersistencePort {
     }
 
     private static Project toDomain(ProjectEntity e) {
-        return new Project(e.getKey(), e.getName(), e.getDescription(), e.getCreatedAt(), e.getUpdatedAt(), e.getVersion());
+        return new Project(e.getKey(), e.getName(), e.getDescription(), e.getEditorRoles(), e.getEditorUsers(), e.getCreatedAt(),
+                e.getUpdatedAt(), e.getVersion());
     }
 }

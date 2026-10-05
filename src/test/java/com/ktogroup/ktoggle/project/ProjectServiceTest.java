@@ -19,12 +19,14 @@ import com.ktogroup.ktoggle.commons.exception.ConflictException;
 import com.ktogroup.ktoggle.commons.exception.MessageCode;
 import com.ktogroup.ktoggle.commons.exception.NotFoundException;
 import com.ktogroup.ktoggle.commons.exception.ValidationException;
+import com.ktogroup.ktoggle.commons.security.CurrentUser;
 import com.ktogroup.ktoggle.commons.time.Ids;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,8 +40,9 @@ class ProjectServiceTest {
     private final ChangeContextProvider changeContextProvider = mock(ChangeContextProvider.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final ChangeContext context = new ChangeContext(Ids.newId(), "alice", null);
+    private final CurrentUser currentUser = mock(CurrentUser.class);
     private final ProjectService service = new ProjectService(persistence, auditService, changeContextProvider, events,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            currentUser, Clock.fixed(NOW, ZoneOffset.UTC));
     private final Project existing = new Project("payments", "Payments", "d", NOW.minusSeconds(60), NOW.minusSeconds(60), 2L);
 
     @BeforeEach
@@ -47,6 +50,44 @@ class ProjectServiceTest {
         when(changeContextProvider.current()).thenReturn(context);
         when(persistence.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(persistence.findByKey("payments")).thenReturn(Optional.of(existing));
+    }
+
+    @Test
+    void restricted_projects_are_editable_only_by_their_roles_users_and_admins() {
+        Project restricted = new Project("casino", "Casino", null, List.of("squad-casino"), List.of("bob", "token:ci-casino"),
+                NOW, NOW, 0L);
+        when(persistence.findByKey("casino")).thenReturn(Optional.of(restricted));
+
+        as("eve", "ktoggle-editor");
+        assertThat(service.canEdit("casino")).isFalse();
+        assertThatThrownBy(() -> service.requireCanEdit("casino")).hasMessageContaining("Only the editors of project 'casino'");
+        assertThat(service.canEdit("payments")).as("unrestricted project").isTrue();
+        assertThat(service.canEdit(null)).as("features without a project").isTrue();
+
+        as("bob", "ktoggle-editor");
+        assertThat(service.canEdit("casino")).isTrue();
+        as("token:ci-casino", "ktoggle-editor");
+        assertThat(service.canEdit("casino")).as("API tokens are listed by name").isTrue();
+        as("carol", "ktoggle-editor", "squad-casino");
+        assertThat(service.canEdit("casino")).isTrue();
+        as("root", "ktoggle-admin");
+        assertThat(service.canEdit("casino")).isTrue();
+    }
+
+    @Test
+    void editor_lists_are_cleaned_and_kept_on_plain_updates() {
+        Project created = service.create("growth", "Growth", "d", List.of(" squad-growth ", "", "squad-growth"), null);
+        assertThat(created.editorRoles()).containsExactly("squad-growth");
+        assertThat(created.restricted()).isTrue();
+
+        Project withEditors = new Project("payments", "Payments", "d", List.of("squad-payments"), List.of(), NOW, NOW, 2L);
+        when(persistence.findByKey("payments")).thenReturn(Optional.of(withEditors));
+        assertThat(service.update("payments", "Payments 2", "d", 2L).editorRoles()).containsExactly("squad-payments");
+    }
+
+    private void as(String user, String... roles) {
+        when(currentUser.username()).thenReturn(user);
+        when(currentUser.roles()).thenReturn(Set.of(roles));
     }
 
     @Test

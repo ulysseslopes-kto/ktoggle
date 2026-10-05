@@ -24,6 +24,7 @@ import com.ktogroup.ktoggle.feature.FeatureService;
 import com.ktogroup.ktoggle.feature.FeatureSnapshot;
 import com.ktogroup.ktoggle.feature.Prerequisite;
 import com.ktogroup.ktoggle.feature.Rule;
+import com.ktogroup.ktoggle.project.ProjectService;
 import com.ktogroup.ktoggle.webhook.WebhookEvent;
 import com.ktogroup.ktoggle.webhook.WebhookNotifier;
 import java.time.Clock;
@@ -62,6 +63,7 @@ public class DraftService {
     private final ChangeContextProvider changeContextProvider;
     private final CurrentUser currentUser;
     private final WebhookNotifier webhooks;
+    private final ProjectService projectService;
     private final Clock clock;
 
     // ---- Queries -------------------------------------------------------------------------------
@@ -120,6 +122,7 @@ public class DraftService {
     public FeatureDraft updateMetadata(UUID id, String projectKey, JsonNode defaultValue, String description, String owner,
                                        List<String> tags, boolean archived, long version) {
         FeatureDraft draft = editable(id, version);
+        projectService.requireCanEdit(projectKey);
         FeatureSnapshot p = draft.proposed();
         FeatureSnapshot proposed = featureService.validate(p.valueType(), new FeatureSnapshot(p.key(), projectKey, p.valueType(),
                 defaultValue, description, owner, tags == null ? List.of() : tags, archived, p.prerequisites(), p.environments()));
@@ -161,6 +164,7 @@ public class DraftService {
     @Transactional
     public FeatureDraft requestReview(UUID id, String comment) {
         FeatureDraft draft = open(id);
+        requireEditRights(draft);
         if (draft.status() == DraftStatus.PENDING_REVIEW || draft.status() == DraftStatus.APPROVED) {
             throw new ConflictException(MessageCode.VALIDATION_ERROR, "Draft is already " + draft.status());
         }
@@ -215,6 +219,8 @@ public class DraftService {
         ChangeContext context = changeContextProvider.current();
         Feature live = featureService.get(draft.featureKey());
         MergeResult merge = merge(draft, live);
+        projectService.requireCanEdit(live.projectKey());
+        projectService.requireCanEdit(merge.merged().projectKey());
         if (!merge.conflicts().isEmpty()) {
             throw new ConflictException(MessageCode.DRAFT_CONFLICT,
                     "Draft conflicts with revision #%d published meanwhile: %s".formatted(live.revision(), merge.conflicts()));
@@ -274,6 +280,8 @@ public class DraftService {
     // ---- Internals -----------------------------------------------------------------------------
 
     private FeatureDraft create(Feature live, FeatureSnapshot proposed, String title) {
+        projectService.requireCanEdit(live.projectKey());
+        projectService.requireCanEdit(proposed.projectKey());
         String user = currentUser.username();
         Instant now = Ids.now(clock);
         FeatureDraft draft = persistence.save(new FeatureDraft(Ids.newId(), live.key(),
@@ -377,7 +385,14 @@ public class DraftService {
         if (!Objects.equals(draft.version(), version)) {
             throw ConflictException.staleVersion("Draft", id.toString(), version, draft.version());
         }
+        requireEditRights(draft);
         return draft;
+    }
+
+    /** Per-project permissions: the caller must be an editor of the live project and of the proposed one. */
+    private void requireEditRights(FeatureDraft draft) {
+        projectService.requireCanEdit(featureService.get(draft.featureKey()).projectKey());
+        projectService.requireCanEdit(draft.proposed().projectKey());
     }
 
     private FeatureDraft open(UUID id) {
@@ -410,7 +425,8 @@ public class DraftService {
         String user = currentUser.username();
         Set<String> roles = currentUser.roles();
         boolean open = draft.status().isOpen();
-        boolean canEdit = open && (roles.contains(SecurityConfiguration.EDITOR) || roles.contains(SecurityConfiguration.ADMIN));
+        boolean canEdit = open && (roles.contains(SecurityConfiguration.EDITOR) || roles.contains(SecurityConfiguration.ADMIN))
+                && projectService.canEdit(live.projectKey()) && projectService.canEdit(draft.proposed().projectKey());
         List<String> blockers = policy.publishBlockers(draft, merge, reviewEnvironments);
         boolean canBypass = open && !reviewEnvironments.isEmpty() && draft.status() != DraftStatus.APPROVED
                 && merge.conflicts().isEmpty() && !merge.changes().isEmpty() && policy.canBypass(settings, roles);

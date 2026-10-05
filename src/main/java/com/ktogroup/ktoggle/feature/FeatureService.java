@@ -99,6 +99,7 @@ public class FeatureService {
             throw ValidationException.of("valueType is required");
         }
         requireProject(projectKey);
+        projectService.requireCanEdit(projectKey);
         requireValue(valueType, defaultValue, "defaultValue");
         ChangeContext context = changeContextProvider.current();
         Instant now = Ids.now(clock);
