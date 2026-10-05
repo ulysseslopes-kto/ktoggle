@@ -58,6 +58,21 @@ class FeatureApiIT {
     }
 
     @Test
+    void feature_list_shows_the_most_recently_changed_first() throws Exception {
+        String project = fixtures.project();
+        String older = unique("a-older");
+        String newer = unique("z-newer");
+        admin.postJson("/admin/v1/features", Map.of("key", older, "projectKey", project, "valueType", "BOOLEAN", "defaultValue", false), 201);
+        admin.postJson("/admin/v1/features", Map.of("key", newer, "projectKey", project, "valueType", "BOOLEAN", "defaultValue", false), 201);
+
+        assertThat(keys(admin.getJson("/admin/v1/features?projectKey=" + project))).containsExactly(newer, older);
+
+        fixtures.publishMetadata(older, Map.of("description", "touched again"));
+
+        assertThat(keys(admin.getJson("/admin/v1/features?projectKey=" + project))).containsExactly(older, newer);
+    }
+
+    @Test
     void feature_creation_is_validated_and_metadata_changes_go_through_a_draft() throws Exception {
         String key = fixtures.feature("BOOLEAN", false);
         assertThat(admin.postJson("/admin/v1/features", Map.of("key", key, "valueType", "BOOLEAN", "defaultValue", false), 409)

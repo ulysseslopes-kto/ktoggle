@@ -18,6 +18,6 @@ public interface FeatureJpaRepository extends JpaRepository<FeatureEntity, UUID>
             WHERE (:projectKey IS NULL OR f.projectKey = :projectKey)
               AND (:archived IS NULL OR f.archived = :archived)
               AND (:search IS NULL OR LOWER(f.key) LIKE :search OR LOWER(f.description) LIKE :search)
-            ORDER BY f.key""")
+            ORDER BY f.updatedAt DESC, f.key""")
     List<FeatureEntity> search(String projectKey, Boolean archived, String search);
 }
