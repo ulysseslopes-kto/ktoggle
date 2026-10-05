@@ -13,6 +13,8 @@ import com.ktogroup.ktoggle.commons.exception.NotFoundException;
 import com.ktogroup.ktoggle.commons.exception.ValidationException;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnectionService;
+import com.ktogroup.ktoggle.webhook.WebhookEvent;
+import com.ktogroup.ktoggle.webhook.WebhookNotifier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ public class BundleService {
     private final SdkConnectionService sdkConnectionService;
     private final AuditService auditService;
     private final ChangeContextProvider changeContextProvider;
+    private final WebhookNotifier webhooks;
 
     @Transactional(readOnly = true)
     public List<Bundle> bundles(String clientKey, int limit) {
@@ -84,6 +87,10 @@ public class BundleService {
                 Map.of("pinnedBundleHash", Objects.toString(connection.pinnedBundleHash(), "")),
                 Map.of("pinnedBundleHash", bundleHash, "activation", activation.hash()));
         publisher.notifyAfterCommit(List.of(activation));
+        webhooks.notify(WebhookEvent.BUNDLE_ROLLED_BACK, context.actor(),
+                "%s rolled %s back to bundle %s".formatted(context.actor(), clientKey, bundleHash.substring(0, 12)),
+                "/sdk-connections/" + clientKey,
+                Map.of("clientKey", clientKey, "bundleHash", bundleHash, "reason", context.reason()));
         return activation;
     }
 

@@ -9,5 +9,6 @@ public enum EntityType {
     SDK_CONNECTION,
     REVIEW_SETTINGS,
     BUNDLE,
-    API_TOKEN
+    API_TOKEN,
+    WEBHOOK
 }

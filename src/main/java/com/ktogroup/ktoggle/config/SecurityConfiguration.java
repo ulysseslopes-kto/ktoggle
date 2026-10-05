@@ -53,11 +53,13 @@ public class SecurityConfiguration {
             "/admin/v1/projects/**",
             "/admin/v1/settings/**",
             "/admin/v1/api-tokens/**",
+            "/admin/v1/webhooks/**",
     };
 
     /** Admin-only even for reading: who holds which credential is not for every viewer. */
     private static final String[] ADMIN_ONLY_READ = {
             "/admin/v1/api-tokens/**",
+            "/admin/v1/webhooks/**",
     };
 
     @Bean

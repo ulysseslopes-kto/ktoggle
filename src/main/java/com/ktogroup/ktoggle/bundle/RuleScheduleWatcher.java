@@ -6,6 +6,8 @@ import com.ktogroup.ktoggle.feature.EnvironmentSettings;
 import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.FeaturePersistencePort;
 import com.ktogroup.ktoggle.feature.Rule;
+import com.ktogroup.ktoggle.webhook.WebhookEvent;
+import com.ktogroup.ktoggle.webhook.WebhookNotifier;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +38,7 @@ public class RuleScheduleWatcher {
 
     private final FeaturePersistencePort featurePersistence;
     private final BundlePublisher publisher;
+    private final WebhookNotifier webhooks;
     private final Clock clock;
 
     @Scheduled(fixedDelayString = "${ktoggle.bundle.schedule-check-interval:PT10S}", initialDelayString = "PT5S")
@@ -49,6 +52,9 @@ public class RuleScheduleWatcher {
         List<BundleActivation> published = publisher.publishAll(new ChangeContext(Ids.newId(), "system:scheduler", reason(switched)));
         if (!published.isEmpty()) {
             log.info("Scheduled rules switched ({}); published {} bundle(s)", switched, published.size());
+            webhooks.notify(WebhookEvent.SCHEDULED_RULES_SWITCHED, "system:scheduler",
+                    "Scheduled rules switched: " + String.join(", ", switched), "/features",
+                    Map.of("switched", switched, "bundles", published.size()));
         }
     }
 

@@ -26,6 +26,7 @@ import com.ktogroup.ktoggle.commons.exception.ValidationException;
 import com.ktogroup.ktoggle.commons.time.Ids;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnectionService;
+import com.ktogroup.ktoggle.webhook.WebhookNotifier;
 import com.ktogroup.ktoggle.ztest.TestBundles;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,7 +45,7 @@ class BundleServiceTest {
     private final AuditService auditService = mock(AuditService.class);
     private final ChangeContextProvider changeContextProvider = mock(ChangeContextProvider.class);
     private final BundleService service = new BundleService(persistence, codec, publisher, sdkConnections, auditService,
-            changeContextProvider);
+            changeContextProvider, mock(WebhookNotifier.class));
 
     private Bundle bundleOfA;
 

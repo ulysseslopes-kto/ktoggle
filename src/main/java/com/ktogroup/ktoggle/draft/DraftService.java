@@ -24,10 +24,13 @@ import com.ktogroup.ktoggle.feature.FeatureService;
 import com.ktogroup.ktoggle.feature.FeatureSnapshot;
 import com.ktogroup.ktoggle.feature.Prerequisite;
 import com.ktogroup.ktoggle.feature.Rule;
+import com.ktogroup.ktoggle.webhook.WebhookEvent;
+import com.ktogroup.ktoggle.webhook.WebhookNotifier;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,6 +61,7 @@ public class DraftService {
     private final AuditService auditService;
     private final ChangeContextProvider changeContextProvider;
     private final CurrentUser currentUser;
+    private final WebhookNotifier webhooks;
     private final Clock clock;
 
     // ---- Queries -------------------------------------------------------------------------------
@@ -306,7 +310,51 @@ public class DraftService {
     }
 
     private void event(FeatureDraft draft, Type type, String comment) {
-        persistence.insertEvent(new DraftEvent(Ids.newId(), draft.id(), type, currentUser.username(), comment, Ids.now(clock)));
+        String actor = currentUser.username();
+        persistence.insertEvent(new DraftEvent(Ids.newId(), draft.id(), type, actor, comment, Ids.now(clock)));
+        WebhookEvent webhookEvent = switch (type) {
+            case REVIEW_REQUESTED -> WebhookEvent.DRAFT_REVIEW_REQUESTED;
+            case APPROVED -> WebhookEvent.DRAFT_APPROVED;
+            case CHANGES_REQUESTED -> WebhookEvent.DRAFT_CHANGES_REQUESTED;
+            case PUBLISHED -> WebhookEvent.DRAFT_PUBLISHED;
+            case BYPASS_PUBLISHED -> WebhookEvent.DRAFT_EMERGENCY_PUBLISHED;
+            default -> null;
+        };
+        if (webhookEvent != null) {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("featureKey", draft.featureKey());
+            data.put("draftId", draft.id().toString());
+            data.put("title", draft.title());
+            data.put("status", draft.status().name());
+            if (draft.publishedRevision() != null) {
+                data.put("revision", draft.publishedRevision());
+            }
+            if (comment != null) {
+                data.put("comment", comment);
+            }
+            String reason = changeContextProvider.current().reason();
+            if (reason != null) {
+                data.put("reason", reason);
+            }
+            webhooks.notify(webhookEvent, actor, actor + " " + describe(type, draft),
+                    "/features/%s?draft=%s&review=1".formatted(draft.featureKey(), draft.id()), data);
+        }
+    }
+
+    private static String describe(Type type, FeatureDraft draft) {
+        String what = "%s (draft \"%s\")".formatted(draft.featureKey(), draft.title() == null ? "untitled" : draft.title());
+        return switch (type) {
+            case REVIEW_REQUESTED -> "asked for a review of " + what;
+            case APPROVED -> "approved " + what;
+            case CHANGES_REQUESTED -> "requested changes on " + what;
+            case PUBLISHED -> "published " + what + revision(draft);
+            case BYPASS_PUBLISHED -> "published " + what + revision(draft) + " WITHOUT APPROVAL";
+            default -> what;
+        };
+    }
+
+    private static String revision(FeatureDraft draft) {
+        return draft.publishedRevision() == null ? "" : " as revision #" + draft.publishedRevision();
     }
 
     private FeatureDraft reviewable(UUID id) {

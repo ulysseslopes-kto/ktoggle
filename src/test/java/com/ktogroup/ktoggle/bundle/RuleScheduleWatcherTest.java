@@ -16,6 +16,7 @@ import com.ktogroup.ktoggle.feature.ForceRule;
 import com.ktogroup.ktoggle.feature.Rule;
 import com.ktogroup.ktoggle.feature.RuleSchedule;
 import com.ktogroup.ktoggle.feature.ValueType;
+import com.ktogroup.ktoggle.webhook.WebhookNotifier;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -29,7 +30,8 @@ class RuleScheduleWatcherTest {
 
     private final FeaturePersistencePort features = mock(FeaturePersistencePort.class);
     private final BundlePublisher publisher = mock(BundlePublisher.class);
-    private final RuleScheduleWatcher watcher = new RuleScheduleWatcher(features, publisher, Clock.fixed(NOW, ZoneOffset.UTC));
+    private final RuleScheduleWatcher watcher = new RuleScheduleWatcher(features, publisher,
+            mock(WebhookNotifier.class), Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
     void reports_rules_that_started_or_ended_in_the_window() {
