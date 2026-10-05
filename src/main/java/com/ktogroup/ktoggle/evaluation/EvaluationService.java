@@ -6,6 +6,7 @@ import com.ktogroup.ktoggle.bundle.BundleActivation;
 import com.ktogroup.ktoggle.bundle.BundleService;
 import com.ktogroup.ktoggle.bundle.BundleService.VerifiedBundle;
 import com.ktogroup.ktoggle.bundle.PayloadCompiler;
+import com.ktogroup.ktoggle.commons.time.Ids;
 import com.ktogroup.ktoggle.decision.AttributeDigester;
 import com.ktogroup.ktoggle.environment.EnvironmentService;
 import com.ktogroup.ktoggle.feature.EnvironmentSettings;
@@ -14,6 +15,7 @@ import com.ktogroup.ktoggle.feature.FeatureService;
 import com.ktogroup.ktoggle.feature.RuleValidator;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupService;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -43,10 +45,11 @@ public class EvaluationService {
     private final BundleService bundleService;
     private final GrowthBookEvaluator evaluator;
     private final AttributeDigester digester;
+    private final Clock clock;
 
     @Transactional(readOnly = true)
     public EvaluationResult simulate(String featureKey, String environmentKey, JsonNode attributes,
-                                     EnvironmentSettings proposed) {
+                                     EnvironmentSettings proposed, Instant at) {
         environmentService.requireExists(environmentKey);
         Feature feature = featureService.get(featureKey);
         if (proposed != null) {
@@ -57,7 +60,8 @@ public class EvaluationService {
             feature = feature.withEnvironments(environments);
         }
         SdkConnection virtual = new SdkConnection("simulation", "simulation", environmentKey, List.of(), null, null, null, null);
-        var compiled = compiler.compile(virtual, List.of(feature), savedGroupService.findAllByKey());
+        var compiled = compiler.compile(virtual, List.of(feature), savedGroupService.findAllByKey(),
+                at == null ? Ids.now(clock) : at);
         return evaluator.evaluate(compiled.payload(), featureKey, attributes);
     }
 

@@ -28,7 +28,8 @@ public class EvaluationController {
     @Operation(summary = "Evaluate a feature for some attributes against the current (or a proposed) configuration")
     @PostMapping("/simulate")
     public EvaluationResult simulate(@Valid @RequestBody SimulateRequest request) {
-        return evaluationService.simulate(request.featureKey(), request.environmentKey(), request.attributes(), request.proposed());
+        return evaluationService.simulate(request.featureKey(), request.environmentKey(), request.attributes(), request.proposed(),
+                request.at());
     }
 
     @Operation(summary = "Reproduce a past decision from an immutable bundle")
@@ -45,7 +46,7 @@ public class EvaluationController {
 
     /** @param proposed optional unsaved environment settings to test before saving them */
     public record SimulateRequest(@NotBlank String featureKey, @NotBlank String environmentKey, JsonNode attributes,
-                                  EnvironmentSettings proposed) {
+                                  EnvironmentSettings proposed, Instant at) {
     }
 
     public record ReplayRequest(@NotBlank String bundleHash, @NotBlank String featureKey, JsonNode attributes) {

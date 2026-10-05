@@ -70,6 +70,9 @@ Suggested demo script:
 3. **A/B experiment:** `deposit-button-copy` splits players between three button copies. Use "Test feature" with
    different `id` values to see each user's variation; the SDK reports every exposure to its tracking callback
    (Mixpanel in production), which the playground log shows.
+   **Scheduled rule:** `welcome-bonus` in Production has a "Black Friday boost" that only goes live from Nov 27 to
+   Dec 1. Use "Evaluate at" in the Test feature panel to preview it; the SDK payload only gets the rule inside its
+   window, and each start and end shows up in the activation chain as `system:scheduler`.
 4. **SDK playground:** connect `Demo · App (staging)`. In another tab, publish a change in Staging and watch it arrive
    over SSE in under a second.
 5. **SDK connections:** show the active bundle with its verified hash and signature, the verified chain and a rollback
@@ -111,9 +114,9 @@ yet.
 
 ## Roadmap
 
-- **Done:** flags and targeting, A/B experiment rules, drafts with configurable review and approval, auditable bundles, replay, delivery and
+- **Done:** flags and targeting, A/B experiment rules, scheduled rules, drafts with configurable review and approval, auditable bundles, replay, delivery and
   decision logs, admin UI (`ktoggle-ui`), one-command demo.
-- **Next:** prerequisites, scheduled rules, "any"/"none" saved-group matching, encrypted
+- **Next:** prerequisites, "any"/"none" saved-group matching, encrypted
   payloads and remote evaluation, API tokens, notifications, per-project permissions.
 - **After the evaluation:** how ktoggle is rolled out inside the company.
 

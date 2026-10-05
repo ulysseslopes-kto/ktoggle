@@ -15,12 +15,14 @@ import com.ktogroup.ktoggle.feature.ExperimentRule;
 import com.ktogroup.ktoggle.feature.ForceRule;
 import com.ktogroup.ktoggle.feature.RolloutRule;
 import com.ktogroup.ktoggle.feature.Rule;
+import com.ktogroup.ktoggle.feature.RuleSchedule;
 import com.ktogroup.ktoggle.feature.ValueType;
 import com.ktogroup.ktoggle.project.ProjectService;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupService;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupService.SavedGroupCommand;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupType;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnectionService;
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -119,8 +121,12 @@ public class DemoDataSeeder {
                 "stg", List.of());
         feature("welcome-bonus", "payments", ValueType.JSON, json("{\"enabled\":false}"), "Welcome bonus configuration",
                 List.of("bonus"),
-                "prd", List.of(force("BR campaign", json("{\"country\":\"BR\"}"), List.of(),
-                        json("{\"enabled\":true,\"percent\":100,\"maxAmount\":500,\"rollover\":10}"))),
+                "prd", List.of(
+                        new ForceRule(null, "Black Friday boost", true, json("{\"country\":\"BR\"}"), List.of(),
+                                json("{\"enabled\":true,\"percent\":200,\"maxAmount\":1000,\"rollover\":10}"),
+                                new RuleSchedule(Instant.parse("2026-11-27T03:00:00Z"), Instant.parse("2026-12-01T03:00:00Z"))),
+                        force("BR campaign", json("{\"country\":\"BR\"}"), List.of(),
+                                json("{\"enabled\":true,\"percent\":100,\"maxAmount\":500,\"rollover\":10}"))),
                 "stg", List.of());
         feature("deposit-button-copy", "payments", ValueType.STRING, TextNode.valueOf("Deposit"), "Deposit button copy (A/B test)",
                 List.of("experiment", "conversion"),

@@ -16,6 +16,7 @@ import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.ForceRule;
 import com.ktogroup.ktoggle.feature.RolloutRule;
 import com.ktogroup.ktoggle.feature.Rule;
+import com.ktogroup.ktoggle.feature.RuleSchedule;
 import com.ktogroup.ktoggle.feature.ValueType;
 import com.ktogroup.ktoggle.savedgroup.SavedGroup;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupType;
@@ -25,9 +26,12 @@ import growthbook.sdk.java.callback.TrackingCallback;
 import growthbook.sdk.java.model.Experiment;
 import growthbook.sdk.java.model.ExperimentResult;
 import growthbook.sdk.java.model.GBContext;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
@@ -41,6 +45,25 @@ class GrowthBookSdkContractTest {
     private final PayloadCompiler compiler = new PayloadCompiler();
     private final GrowthBookEvaluator evaluator = new GrowthBookEvaluator(objectMapper);
     private final SdkConnection prd = new SdkConnection("sdk-test1234", "test", "prd", List.of(), null, null, null, null);
+    private static final Instant NOW = Instant.parse("2026-10-05T12:00:00Z");
+
+    @Test
+    void scheduled_rules_are_served_only_inside_their_window() {
+        Instant start = NOW.plus(Duration.ofHours(1));
+        Instant end = NOW.plus(Duration.ofHours(2));
+        Rule promo = new ForceRule("fr_promo", "Weekend promo", true, null, List.of(), BooleanNode.TRUE,
+                new RuleSchedule(start, end));
+        Feature feature = feature("promo", ValueType.BOOLEAN, BooleanNode.FALSE, new EnvironmentSettings(true, List.of(promo)));
+        Function<Instant, ObjectNode> at = instant -> compiler.compile(prd, List.of(feature), Map.of(), instant).payload();
+
+        assertThat(sdkIsOn(at.apply(NOW), "promo", "{}")).as("before the window").isFalse();
+        assertThat(at.apply(NOW).path("features").path("promo").has("rules")).isFalse();
+        assertThat(sdkIsOn(at.apply(start), "promo", "{}")).as("start is inclusive").isTrue();
+        assertThat(sdkIsOn(at.apply(end.minusMillis(1)), "promo", "{}")).isTrue();
+        assertThat(sdkIsOn(at.apply(end), "promo", "{}")).as("end is exclusive").isFalse();
+        assertThat(at.apply(start).path("features").path("promo").path("rules").get(0).has("schedule"))
+                .as("the schedule itself never reaches the SDK").isFalse();
+    }
 
     @Test
     void experiment_splits_users_by_weight_sticky_and_reports_exposures() {
@@ -148,7 +171,7 @@ class GrowthBookSdkContractTest {
         Rule rule = new ForceRule("fr_g", null, true, cond("{\"country\":\"BR\"}"), List.of("vips", "adults"), TextNode.valueOf("gold"));
         ObjectNode payload = compiler.compile(prd,
                 List.of(feature("tier", ValueType.STRING, TextNode.valueOf("std"), new EnvironmentSettings(true, List.of(rule)))),
-                Map.of("vips", vips, "adults", adults)).payload();
+                Map.of("vips", vips, "adults", adults), NOW).payload();
 
         assertThat(payload.path("features").path("tier").path("rules").get(0).path("condition").has("$and")).isTrue();
         assertThat(sdkValue(payload, "tier", "{\"userId\":\"u1\",\"age\":30,\"country\":\"BR\"}")).isEqualTo("gold");
@@ -176,13 +199,13 @@ class GrowthBookSdkContractTest {
         Feature inProject = feature("pix", ValueType.BOOLEAN, BooleanNode.TRUE, new EnvironmentSettings(true, List.of())).withProjectKey("payments");
         Feature other = feature("kyc", ValueType.BOOLEAN, BooleanNode.TRUE, new EnvironmentSettings(true, List.of())).withProjectKey("kyc");
 
-        JsonNode features = compiler.compile(payments, List.of(inProject, other), Map.of()).payload().path("features");
+        JsonNode features = compiler.compile(payments, List.of(inProject, other), Map.of(), NOW).payload().path("features");
         assertThat(features.has("pix")).isTrue();
         assertThat(features.has("kyc")).isFalse();
     }
 
     private ObjectNode compile(Feature feature) {
-        return compiler.compile(prd, List.of(feature), Map.of()).payload();
+        return compiler.compile(prd, List.of(feature), Map.of(), NOW).payload();
     }
 
     /** Exactly how KTO services use the SDK (see player-service GrowthBookConfiguration). */

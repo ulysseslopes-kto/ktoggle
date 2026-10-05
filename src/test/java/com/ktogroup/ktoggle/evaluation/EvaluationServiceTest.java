@@ -39,7 +39,7 @@ class EvaluationServiceTest {
             new DecisionProperties("k1", java.util.Base64.getEncoder().encodeToString(new byte[32]), 0, 0, null, null, 0, 0));
     private final EvaluationService service = new EvaluationService(mock(FeatureService.class), environmentService,
             mock(SavedGroupService.class), mock(AttributeService.class), mock(RuleValidator.class), new PayloadCompiler(),
-            bundleService, new GrowthBookEvaluator(mapper), digester);
+            bundleService, new GrowthBookEvaluator(mapper), digester, java.time.Clock.systemUTC());
 
     @Test
     void replay_evaluates_the_bundle_payload_and_reports_where_the_decision_came_from() {
@@ -109,6 +109,6 @@ class EvaluationServiceTest {
     void simulation_of_an_unknown_environment_fails_before_touching_the_feature() {
         org.mockito.Mockito.doThrow(new NotFoundException("Environment", "nope")).when(environmentService).requireExists("nope");
 
-        assertThatThrownBy(() -> service.simulate("checkout", "nope", null, null)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.simulate("checkout", "nope", null, null, null)).isInstanceOf(NotFoundException.class);
     }
 }

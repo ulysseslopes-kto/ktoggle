@@ -73,7 +73,7 @@ public class BundlePublisher {
                 log.debug("Connection {} is pinned to {}, skipping publication", connection.clientKey(), connection.pinnedBundleHash());
                 continue;
             }
-            publish(context, connection, compiler.compile(connection, features, groups)).ifPresent(activations::add);
+            publish(context, connection, compiler.compile(connection, features, groups, Ids.now(clock))).ifPresent(activations::add);
         }
         sample.stop(meterRegistry.timer("ktoggle.bundle.publish"));
         notifyAfterCommit(activations);

@@ -79,6 +79,18 @@ class RuleValidatorTest {
     }
 
     @Test
+    void a_schedule_must_end_after_it_starts() {
+        Instant start = Instant.parse("2026-10-10T10:00:00Z");
+        assertInvalid(List.of(new ForceRule(null, null, true, null, null, JSON.booleanNode(true), new RuleSchedule(start, start))),
+                "rules[0]: the schedule must end after it starts");
+        assertThat(validator.validate(ValueType.BOOLEAN, List.of(
+                new ForceRule(null, null, true, null, null, JSON.booleanNode(true), new RuleSchedule(start, null)),
+                new ForceRule(null, null, true, null, null, JSON.booleanNode(true), new RuleSchedule(null, start)),
+                new ForceRule(null, null, true, null, null, JSON.booleanNode(true), new RuleSchedule(start, start.plusSeconds(1)))),
+                attributes, groups)).hasSize(3);
+    }
+
+    @Test
     void no_rules_means_an_empty_list() {
         assertThat(validator.validate(ValueType.BOOLEAN, null, attributes, groups)).isEmpty();
         assertThat(validator.validate(ValueType.BOOLEAN, List.of(), attributes, groups)).isEmpty();

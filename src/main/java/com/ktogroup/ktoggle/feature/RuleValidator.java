@@ -66,6 +66,11 @@ public class RuleValidator {
                 throw ValidationException.of("%s: unknown saved group '%s'".formatted(at, group));
             }
         }
+        RuleSchedule schedule = rule.schedule();
+        if (schedule != null && schedule.startsAt() != null && schedule.endsAt() != null
+                && !schedule.endsAt().isAfter(schedule.startsAt())) {
+            throw ValidationException.of("%s: the schedule must end after it starts".formatted(at));
+        }
         switch (rule) {
             case ForceRule ignored -> {
                 // value and targeting already validated

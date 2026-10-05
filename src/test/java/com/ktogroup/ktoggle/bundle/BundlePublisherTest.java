@@ -61,7 +61,7 @@ class BundlePublisherTest {
     @Test
     void the_first_publication_of_a_connection_starts_its_chain() {
         SdkConnection connection = connection("sdk-a", null);
-        when(compiler.compile(any(), any(), any())).thenReturn(compiled(true));
+        when(compiler.compile(any(), any(), any(), any())).thenReturn(compiled(true));
         when(persistence.findLastActivation("sdk-a")).thenReturn(Optional.empty());
 
         List<BundleActivation> activations = publisher.publishLocked(context, List.of(connection));
@@ -87,7 +87,7 @@ class BundlePublisherTest {
         SdkConnection connection = connection("sdk-a", null);
         Bundle active = bundleFor("sdk-a", false);
         BundleActivation last = TestBundles.activation("sdk-a", 7, active.hash(), "p");
-        when(compiler.compile(any(), any(), any())).thenReturn(compiled(true));
+        when(compiler.compile(any(), any(), any(), any())).thenReturn(compiled(true));
         when(persistence.findLastActivation("sdk-a")).thenReturn(Optional.of(last));
         when(persistence.findByHash(active.hash())).thenReturn(Optional.of(active));
 
@@ -102,7 +102,7 @@ class BundlePublisherTest {
     void no_new_bundle_is_created_when_the_payload_is_unchanged() {
         SdkConnection connection = connection("sdk-a", null);
         Bundle active = bundleFor("sdk-a", true);
-        when(compiler.compile(any(), any(), any())).thenReturn(compiled(true));
+        when(compiler.compile(any(), any(), any(), any())).thenReturn(compiled(true));
         when(persistence.findLastActivation("sdk-a")).thenReturn(Optional.of(TestBundles.activation("sdk-a", 3, active.hash(), "p")));
         when(persistence.findByHash(active.hash())).thenReturn(Optional.of(active));
 
@@ -117,7 +117,7 @@ class BundlePublisherTest {
     @Test
     void if_the_active_bundle_cannot_be_loaded_the_payload_is_published_again() {
         SdkConnection connection = connection("sdk-a", null);
-        when(compiler.compile(any(), any(), any())).thenReturn(compiled(true));
+        when(compiler.compile(any(), any(), any(), any())).thenReturn(compiled(true));
         when(persistence.findLastActivation("sdk-a")).thenReturn(Optional.of(TestBundles.activation("sdk-a", 3, "e".repeat(64), "p")));
         when(persistence.findByHash("e".repeat(64))).thenReturn(Optional.empty());
 
@@ -128,19 +128,19 @@ class BundlePublisherTest {
     void pinned_connections_are_skipped_while_the_others_are_published() {
         SdkConnection pinned = connection("sdk-pinned", "d".repeat(64));
         SdkConnection free = connection("sdk-free", null);
-        when(compiler.compile(any(), any(), any())).thenReturn(compiled(true));
+        when(compiler.compile(any(), any(), any(), any())).thenReturn(compiled(true));
         when(persistence.findLastActivation("sdk-free")).thenReturn(Optional.empty());
 
         List<BundleActivation> activations = publisher.publishLocked(context, List.of(pinned, free));
 
         assertThat(activations).extracting(BundleActivation::clientKey).containsExactly("sdk-free");
-        verify(compiler, never()).compile(org.mockito.ArgumentMatchers.eq(pinned), any(), any());
+        verify(compiler, never()).compile(org.mockito.ArgumentMatchers.eq(pinned), any(), any(), any());
         verify(persistence, never()).findLastActivation("sdk-pinned");
     }
 
     @Test
     void activations_are_broadcast_only_after_the_transaction_commits() {
-        when(compiler.compile(any(), any(), any())).thenReturn(compiled(true));
+        when(compiler.compile(any(), any(), any(), any())).thenReturn(compiled(true));
         when(persistence.findLastActivation("sdk-a")).thenReturn(Optional.empty());
 
         BundleActivation activation = publisher.publishLocked(context, List.of(connection("sdk-a", null))).getFirst();
@@ -153,7 +153,7 @@ class BundlePublisherTest {
     @Test
     void publish_all_takes_the_publication_lock_and_publishes_every_connection() {
         when(sdkConnectionService.findAll()).thenReturn(List.of(connection("sdk-a", null), connection("sdk-b", null)));
-        when(compiler.compile(any(), any(), any())).thenReturn(compiled(true));
+        when(compiler.compile(any(), any(), any(), any())).thenReturn(compiled(true));
         when(persistence.findLastActivation(any())).thenReturn(Optional.empty());
 
         List<BundleActivation> activations = publisher.publishAll(context);

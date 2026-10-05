@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktogroup.ktoggle.bundle.BundleActivatedEvent;
+import com.ktogroup.ktoggle.bundle.RuleScheduleWatcher;
 import com.ktogroup.ktoggle.commons.canonical.CanonicalJson;
 import com.ktogroup.ktoggle.commons.canonical.Hashes;
 import com.ktogroup.ktoggle.decision.DecisionIngestService;
@@ -19,6 +20,7 @@ import com.ktogroup.ktoggle.ztest.IntegrationTest;
 import growthbook.sdk.java.GrowthBook;
 import growthbook.sdk.java.model.GBContext;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +49,8 @@ class KtoggleFlowIT {
     private DecisionIngestService decisionIngestService;
     @Autowired
     private CanonicalJson canonicalJson;
+    @Autowired
+    private RuleScheduleWatcher scheduleWatcher;
 
     private AdminApi admin;
     private AdminApi viewer;
@@ -246,6 +250,32 @@ class KtoggleFlowIT {
         assertThat(stored.get(0).path("type").asText()).isEqualTo("experiment");
         new Fixtures(admin).publishEnvironment(s.feature(), s.environment(), false,
                 List.of(objectMapper.convertValue(stored.get(0), Map.class)));
+    }
+
+    @Test
+    void scheduled_rules_go_live_when_their_window_opens_and_the_scheduler_is_audited() throws Exception {
+        Setup s = setup();
+        Instant startsAt = Instant.now().plusMillis(1500);
+        new Fixtures(admin).publishEnvironment(s.feature(), s.environment(), true, List.of(Map.of("type", "force",
+                "enabled", true, "value", true, "schedule", Map.of("startsAt", startsAt.toString()))));
+
+        JsonNode stored = admin.getJson("/admin/v1/features/" + s.feature()).path("environments").path(s.environment())
+                .path("rules").get(0).path("schedule");
+        assertThat(Instant.parse(stored.path("startsAt").asText())).isEqualTo(startsAt);
+        assertThat(stored.has("empty")).as("helpers are not serialized").isFalse();
+        assertThat(sdkIsOn(fetch(s.clientKey()).body(), s.feature(), "{}")).as("not started yet").isFalse();
+
+        JsonNode future = admin.postJson("/admin/v1/simulate", Map.of("featureKey", s.feature(), "environmentKey", s.environment(),
+                "at", startsAt.plusSeconds(60).toString()), 200);
+        assertThat(future.path("value").asBoolean()).as("simulation at a future instant").isTrue();
+
+        Thread.sleep(Duration.between(Instant.now(), startsAt).plusMillis(200).toMillis());
+        scheduleWatcher.publishDueSchedules();
+
+        assertThat(sdkIsOn(fetch(s.clientKey()).body(), s.feature(), "{}")).isTrue();
+        JsonNode last = admin.getJson("/admin/v1/sdk-connections/" + s.clientKey() + "/activations").get(0);
+        assertThat(last.path("activatedBy").asText()).isEqualTo("system:scheduler");
+        assertThat(last.path("reason").asText()).contains(s.feature() + "/" + s.environment()).contains("started");
     }
 
     @Test

@@ -12,6 +12,7 @@ import com.ktogroup.ktoggle.feature.RolloutRule;
 import com.ktogroup.ktoggle.feature.Rule;
 import com.ktogroup.ktoggle.savedgroup.SavedGroup;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -27,7 +28,7 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>Archived features and features disabled in the environment are omitted — SDKs then evaluate them to
  *   {@code null}/off, exactly like GrowthBook does for disabled environments.</li>
- *   <li>Disabled rules are omitted.</li>
+ *   <li>Disabled rules, and scheduled rules outside their window, are omitted (SDKs do not evaluate schedules).</li>
  *   <li>Saved groups are inlined into the rule condition ({@code $and}), because growthbook-sdk-java 0.10.x
  *   does not support {@code $inGroup}.</li>
  * </ul>
@@ -37,7 +38,11 @@ public class PayloadCompiler {
 
     private static final JsonNodeFactory JSON = JsonNodeFactory.instance;
 
-    public CompiledPayload compile(SdkConnection connection, List<Feature> features, Map<String, SavedGroup> savedGroups) {
+    /**
+     * @param at instant the payload is compiled for: scheduled rules are included only inside their window
+     */
+    public CompiledPayload compile(SdkConnection connection, List<Feature> features, Map<String, SavedGroup> savedGroups,
+                                   Instant at) {
         ObjectNode compiledFeatures = JSON.objectNode();
         Map<String, Integer> sources = new TreeMap<>();
         features.stream()
@@ -47,7 +52,7 @@ public class PayloadCompiler {
                 .forEach(feature -> {
                     EnvironmentSettings settings = feature.environment(connection.environmentKey());
                     if (settings.enabled()) {
-                        compiledFeatures.set(feature.key(), compileFeature(feature, settings, savedGroups));
+                        compiledFeatures.set(feature.key(), compileFeature(feature, settings, savedGroups, at));
                         sources.put(feature.key(), feature.revision());
                     }
                 });
@@ -56,11 +61,12 @@ public class PayloadCompiler {
         return new CompiledPayload(payload, sources);
     }
 
-    private static ObjectNode compileFeature(Feature feature, EnvironmentSettings settings, Map<String, SavedGroup> groups) {
+    private static ObjectNode compileFeature(Feature feature, EnvironmentSettings settings, Map<String, SavedGroup> groups,
+                                             Instant at) {
         ObjectNode definition = JSON.objectNode();
         definition.set("defaultValue", feature.defaultValue());
         ArrayNode rules = JSON.arrayNode();
-        settings.rules().stream().filter(Rule::enabled).forEach(rule -> rules.add(compileRule(rule, groups)));
+        settings.rules().stream().filter(rule -> rule.liveAt(at)).forEach(rule -> rules.add(compileRule(rule, groups)));
         if (!rules.isEmpty()) {
             definition.set("rules", rules);
         }
