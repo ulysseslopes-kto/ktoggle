@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * An override rule evaluated top to bottom; the first matching rule wins, otherwise the default value is served.
@@ -26,8 +27,19 @@ public sealed interface Rule permits ForceRule, RolloutRule, ExperimentRule {
     /** Targeting condition (MongoDB-like); null or {} matches everyone. */
     JsonNode condition();
 
-    /** Keys of saved groups the user must belong to (AND), inlined into the condition at compile time. */
+    /** Keys of saved groups the user must belong to, all of them (AND); inlined into the condition at compile time. */
     List<String> savedGroups();
+
+    /** Keys of saved groups the user must belong to at least one of (OR). */
+    List<String> savedGroupsAny();
+
+    /** Keys of saved groups the user must belong to none of (NOR). */
+    List<String> savedGroupsNone();
+
+    /** Every saved group the rule references, whatever the match type. */
+    default Stream<String> referencedSavedGroups() {
+        return Stream.of(savedGroups(), savedGroupsAny(), savedGroupsNone()).flatMap(List::stream);
+    }
 
     /** Value served when the rule applies (for experiments: the control variation). */
     JsonNode value();

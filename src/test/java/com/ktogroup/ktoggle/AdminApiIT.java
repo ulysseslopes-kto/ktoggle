@@ -229,6 +229,14 @@ class AdminApiIT {
 
         assertThat(admin.delete("/admin/v1/saved-groups/" + group, 409).path("messageCode").asText()).isEqualTo("ENTITY_IN_USE");
 
+        fixtures.publishEnvironment(feature, environment, true, List.of(
+                Map.of("type", "force", "enabled", true, "value", true, "savedGroupsAny", List.of(group))));
+        assertThat(admin.delete("/admin/v1/saved-groups/" + group, 409).path("messageCode").asText()).isEqualTo("ENTITY_IN_USE");
+        fixtures.publishEnvironment(feature, environment, true, List.of(
+                Map.of("type", "force", "enabled", true, "value", true, "savedGroupsNone", List.of(group))));
+        assertThat(admin.delete("/admin/v1/saved-groups/" + group, 409).path("messageCode").asText())
+                .as("an excluded group is in use too").isEqualTo("ENTITY_IN_USE");
+
         fixtures.publishEnvironment(feature, environment, true, List.of());
         admin.delete("/admin/v1/saved-groups/" + group, 204);
         admin.delete("/admin/v1/saved-groups/" + group, 404);

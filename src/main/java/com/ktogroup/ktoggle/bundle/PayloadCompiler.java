@@ -32,8 +32,8 @@ import org.springframework.stereotype.Component;
  *   <li>Disabled rules, and scheduled rules outside their window, are omitted (SDKs do not evaluate schedules).</li>
  *   <li>Prerequisites become {@code parentConditions}: feature-level ones as a leading gate rule, rule-level ones on
  *   the rule itself.</li>
- *   <li>Saved groups are inlined into the rule condition ({@code $and}), because growthbook-sdk-java 0.10.x
- *   does not support {@code $inGroup}.</li>
+ *   <li>Saved groups are inlined into the rule condition ({@code $and} for "all", {@code $or} for "any",
+ *   {@code $nor} for "none"), because growthbook-sdk-java 0.10.x does not support {@code $inGroup}.</li>
  * </ul>
  */
 @Component
@@ -148,11 +148,13 @@ public class PayloadCompiler {
             parts.add(rule.condition());
         }
         for (String groupKey : rule.savedGroups()) {
-            SavedGroup group = groups.get(groupKey);
-            if (group == null) {
-                throw new IllegalStateException("Rule %s references missing saved group '%s'".formatted(rule.id(), groupKey));
-            }
-            parts.add(group.toCondition());
+            parts.add(group(rule, groupKey, groups));
+        }
+        if (!rule.savedGroupsAny().isEmpty()) {
+            parts.add(combine("$or", rule, rule.savedGroupsAny(), groups));
+        }
+        if (!rule.savedGroupsNone().isEmpty()) {
+            parts.add(combine("$nor", rule, rule.savedGroupsNone(), groups));
         }
         if (parts.isEmpty()) {
             return null;
@@ -163,6 +165,25 @@ public class PayloadCompiler {
         ObjectNode and = JSON.objectNode();
         and.putArray("$and").addAll(parts);
         return and;
+    }
+
+    /** {@code {"$or": [...]}} / {@code {"$nor": [...]}} of the groups' conditions (a single "any" group is used as is). */
+    private static JsonNode combine(String operator, Rule rule, List<String> keys, Map<String, SavedGroup> groups) {
+        if (keys.size() == 1 && "$or".equals(operator)) {
+            return group(rule, keys.getFirst(), groups);
+        }
+        ObjectNode combined = JSON.objectNode();
+        ArrayNode list = combined.putArray(operator);
+        keys.forEach(key -> list.add(group(rule, key, groups)));
+        return combined;
+    }
+
+    private static JsonNode group(Rule rule, String key, Map<String, SavedGroup> groups) {
+        SavedGroup group = groups.get(key);
+        if (group == null) {
+            throw new IllegalStateException("Rule %s references missing saved group '%s'".formatted(rule.id(), key));
+        }
+        return group.toCondition();
     }
 
     /**

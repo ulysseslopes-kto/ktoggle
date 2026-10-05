@@ -14,6 +14,8 @@ public interface SavedGroupJpaRepository extends JpaRepository<SavedGroupEntity,
     @Query(nativeQuery = true, value = """
             SELECT EXISTS (
                 SELECT 1 FROM feature_environment fe, jsonb_array_elements(fe.rules) rule
-                WHERE jsonb_exists(rule -> 'savedGroups', :key))""")
+                WHERE jsonb_exists(rule -> 'savedGroups', :key)
+                   OR jsonb_exists(rule -> 'savedGroupsAny', :key)
+                   OR jsonb_exists(rule -> 'savedGroupsNone', :key))""")
     boolean isReferenced(String key);
 }

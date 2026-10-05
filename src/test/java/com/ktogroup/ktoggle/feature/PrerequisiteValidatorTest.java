@@ -51,7 +51,7 @@ class PrerequisiteValidatorTest {
     @Test
     void rejects_cycles_through_feature_and_rule_prerequisites() {
         features.put("a", feature("a", "payments").withPrerequisites(List.of(on("b"))));
-        Rule dependsOnA = new ForceRule("fr_x", null, true, null, List.of(), BooleanNode.TRUE, null, List.of(on("a")));
+        Rule dependsOnA = new ForceRule("fr_x", null, true, null, List.of(), BooleanNode.TRUE, null, List.of(on("a")), null, null);
         FeatureSnapshot b = snapshot("b", "payments", List.of())
                 .withEnvironments(Map.of("prd", new EnvironmentSettings(true, List.of(dependsOnA))));
 

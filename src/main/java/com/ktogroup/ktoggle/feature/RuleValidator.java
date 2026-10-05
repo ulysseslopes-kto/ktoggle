@@ -61,11 +61,16 @@ public class RuleValidator {
             throw new ValidationException(MessageCode.INVALID_VALUE, "%s: value is not a valid %s".formatted(at, valueType));
         }
         conditionValidator.validate(rule.condition(), attributes.keySet());
-        for (String group : rule.savedGroups()) {
+        rule.referencedSavedGroups().forEach(group -> {
             if (!savedGroupKeys.contains(group)) {
                 throw ValidationException.of("%s: unknown saved group '%s'".formatted(at, group));
             }
-        }
+        });
+        Set<String> inAll = Set.copyOf(rule.savedGroups());
+        rule.savedGroupsNone().stream().filter(g -> inAll.contains(g) || rule.savedGroupsAny().contains(g)).findFirst()
+                .ifPresent(group -> {
+                    throw ValidationException.of("%s: saved group '%s' is both required and excluded".formatted(at, group));
+                });
         RuleSchedule schedule = rule.schedule();
         if (schedule != null && schedule.startsAt() != null && schedule.endsAt() != null
                 && !schedule.endsAt().isAfter(schedule.startsAt())) {

@@ -16,8 +16,8 @@ import java.util.List;
  */
 public record ExperimentRule(String id, String description, boolean enabled, JsonNode condition, List<String> savedGroups,
                              String trackingKey, String hashAttribute, double coverage, List<Variation> variations,
-                             int hashVersion, String seed, RuleSchedule schedule, List<Prerequisite> prerequisites)
-        implements Rule {
+                             int hashVersion, String seed, RuleSchedule schedule, List<Prerequisite> prerequisites,
+                             List<String> savedGroupsAny, List<String> savedGroupsNone) implements Rule {
 
     public static final int DEFAULT_HASH_VERSION = 2;
 
@@ -28,13 +28,15 @@ public record ExperimentRule(String id, String description, boolean enabled, Jso
         hashVersion = hashVersion == 0 ? DEFAULT_HASH_VERSION : hashVersion;
         schedule = Rule.normalize(schedule);
         prerequisites = Prerequisite.normalize(prerequisites);
+        savedGroupsAny = savedGroupsAny == null ? List.of() : List.copyOf(savedGroupsAny);
+        savedGroupsNone = savedGroupsNone == null ? List.of() : List.copyOf(savedGroupsNone);
     }
 
     public ExperimentRule(String id, String description, boolean enabled, JsonNode condition, List<String> savedGroups,
                           String trackingKey, String hashAttribute, double coverage, List<Variation> variations,
                           int hashVersion, String seed) {
         this(id, description, enabled, condition, savedGroups, trackingKey, hashAttribute, coverage, variations, hashVersion,
-                seed, null, null);
+                seed, null, null, null, null);
     }
 
     /** The control (first variation) value — used where a single representative value is needed. */
@@ -46,7 +48,7 @@ public record ExperimentRule(String id, String description, boolean enabled, Jso
     @Override
     public Rule withId(String newId) {
         return new ExperimentRule(newId, description, enabled, condition, savedGroups, trackingKey, hashAttribute, coverage,
-                variations, hashVersion, seed, schedule, prerequisites);
+                variations, hashVersion, seed, schedule, prerequisites, savedGroupsAny, savedGroupsNone);
     }
 
     /**

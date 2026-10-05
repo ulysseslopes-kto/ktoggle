@@ -79,6 +79,18 @@ class RuleValidatorTest {
     }
 
     @Test
+    void any_and_none_saved_groups_must_exist_and_not_contradict_each_other() {
+        assertThat(validator.validate(ValueType.BOOLEAN, List.of(new ForceRule(null, null, true, null, List.of(), JSON.booleanNode(true),
+                null, null, List.of("vips"), List.of())), attributes, groups)).hasSize(1);
+        assertInvalid(List.of(new ForceRule(null, null, true, null, List.of(), JSON.booleanNode(true), null, null,
+                List.of("ghosts"), null)), "unknown saved group 'ghosts'");
+        assertInvalid(List.of(new ForceRule(null, null, true, null, List.of(), JSON.booleanNode(true), null, null,
+                null, List.of("ghosts"))), "unknown saved group 'ghosts'");
+        assertInvalid(List.of(new ForceRule(null, null, true, null, List.of("vips"), JSON.booleanNode(true), null, null,
+                null, List.of("vips"))), "saved group 'vips' is both required and excluded");
+    }
+
+    @Test
     void a_schedule_must_end_after_it_starts() {
         Instant start = Instant.parse("2026-10-10T10:00:00Z");
         assertInvalid(List.of(new ForceRule(null, null, true, null, null, JSON.booleanNode(true), new RuleSchedule(start, start))),

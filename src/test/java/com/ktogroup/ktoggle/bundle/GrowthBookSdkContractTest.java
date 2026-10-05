@@ -88,7 +88,7 @@ class GrowthBookSdkContractTest {
         Feature parent = feature("vip-program", ValueType.BOOLEAN, BooleanNode.FALSE, new EnvironmentSettings(true, List.of(
                 new ForceRule("fr_vip", null, true, cond("{\"vip\":true}"), List.of(), BooleanNode.TRUE))));
         Rule dependent = new ForceRule("fr_gold", null, true, null, List.of(), TextNode.valueOf("gold"), null,
-                List.of(new Prerequisite("vip-program", cond("{\"value\": true}"))));
+                List.of(new Prerequisite("vip-program", cond("{\"value\": true}"))), null, null);
         Rule fallback = new ForceRule("fr_all", null, true, null, List.of(), TextNode.valueOf("silver"));
         Feature child = feature("lobby-theme", ValueType.STRING, TextNode.valueOf("std"),
                 new EnvironmentSettings(true, List.of(dependent, fallback)));
@@ -213,6 +213,36 @@ class GrowthBookSdkContractTest {
         boolean first = sdkIsOn(payload, "half", "{\"userId\":\"u42\"}");
         assertThat(IntStream.range(0, 20).allMatch(i -> sdkIsOn(payload, "half", "{\"userId\":\"u42\"}") == first)).isTrue();
         assertThat(sdkIsOn(payload, "half", "{}")).as("users without the hash attribute are excluded").isFalse();
+    }
+
+    @Test
+    void saved_groups_match_any_and_none() {
+        SavedGroup vips = new SavedGroup("vips", "VIPs", null, SavedGroupType.LIST, "userId",
+                List.of(TextNode.valueOf("u1")), null, null, null, null);
+        SavedGroup testers = new SavedGroup("testers", "Testers", null, SavedGroupType.LIST, "userId",
+                List.of(TextNode.valueOf("u2")), null, null, null, null);
+        SavedGroup blocked = new SavedGroup("blocked", "Blocked", null, SavedGroupType.CONDITION, null, null,
+                cond("{\"country\":\"XX\"}"), null, null, null);
+        Map<String, SavedGroup> groups = Map.of("vips", vips, "testers", testers, "blocked", blocked);
+        Rule anyNotBlocked = new ForceRule("fr_any", null, true, null, List.of(), TextNode.valueOf("early"), null, null,
+                List.of("vips", "testers"), List.of("blocked"));
+        ObjectNode payload = compiler.compile(prd, List.of(feature("access", ValueType.STRING, TextNode.valueOf("std"),
+                new EnvironmentSettings(true, List.of(anyNotBlocked)))), groups, NOW).payload();
+
+        JsonNode condition = payload.path("features").path("access").path("rules").get(0).path("condition");
+        assertThat(condition.path("$and").get(0).has("$or")).isTrue();
+        assertThat(condition.path("$and").get(1).has("$nor")).isTrue();
+        assertThat(sdkValue(payload, "access", "{\"userId\":\"u1\",\"country\":\"BR\"}")).as("in one of the groups").isEqualTo("early");
+        assertThat(sdkValue(payload, "access", "{\"userId\":\"u2\",\"country\":\"BR\"}")).as("in the other").isEqualTo("early");
+        assertThat(sdkValue(payload, "access", "{\"userId\":\"u3\",\"country\":\"BR\"}")).as("in none").isEqualTo("std");
+        assertThat(sdkValue(payload, "access", "{\"userId\":\"u1\",\"country\":\"XX\"}")).as("excluded group wins").isEqualTo("std");
+
+        Rule notBlocked = new ForceRule("fr_none", null, true, null, List.of(), TextNode.valueOf("ok"), null, null, null,
+                List.of("blocked"));
+        ObjectNode onlyNone = compiler.compile(prd, List.of(feature("access", ValueType.STRING, TextNode.valueOf("std"),
+                new EnvironmentSettings(true, List.of(notBlocked)))), groups, NOW).payload();
+        assertThat(sdkValue(onlyNone, "access", "{\"country\":\"BR\"}")).isEqualTo("ok");
+        assertThat(sdkValue(onlyNone, "access", "{\"country\":\"XX\"}")).isEqualTo("std");
     }
 
     @Test
