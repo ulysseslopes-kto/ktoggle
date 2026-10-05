@@ -69,9 +69,9 @@ class ReviewPolicyTest {
         MergeResult conflicting = new MergeResult(snapshot(Map.of()), List.of("environments.prd"), List.of());
 
         assertThat(policy.publishBlockers(draft, conflicting, List.of("prd")))
-                .anySatisfy(b -> assertThat(b).contains("Conflitos"))
-                .anySatisfy(b -> assertThat(b).contains("Nenhuma alteração"))
-                .anySatisfy(b -> assertThat(b).contains("Requer aprovação"));
+                .anySatisfy(b -> assertThat(b).contains("Conflicts"))
+                .anySatisfy(b -> assertThat(b).contains("No changes"))
+                .anySatisfy(b -> assertThat(b).contains("Requires approval"));
         MergeResult clean = merge(Map.of(), new SectionChange("description", null, null));
         assertThat(policy.publishBlockers(draft.withStatus(DraftStatus.APPROVED), clean, List.of("prd"))).isEmpty();
         assertThat(policy.publishBlockers(draft.withStatus(DraftStatus.PUBLISHED), clean, List.of()))

@@ -63,7 +63,7 @@ public class DemoDataSeeder {
         try {
             seedCatalog();
             seedFeatures();
-            connections.create(PRD_CLIENT_KEY, "Demo · Web (produção)", "prd", List.of());
+            connections.create(PRD_CLIENT_KEY, "Demo · Web (production)", "prd", List.of());
             connections.create(STG_CLIENT_KEY, "Demo · App (staging)", "stg", List.of());
             log.info("Demo data seeded. Client keys: {} (prd), {} (stg)", PRD_CLIENT_KEY, STG_CLIENT_KEY);
         } finally {
@@ -72,56 +72,56 @@ public class DemoDataSeeder {
     }
 
     private void seedCatalog() {
-        environments.create("dev", "Desenvolvimento", "Ambiente de desenvolvimento", 0);
-        environments.create("stg", "Staging", "Homologação", 1);
-        environments.create("prd", "Produção", "Produção — publicação exige aprovação", 2, true);
-        projects.create("sportsbook", "Sportsbook", "Apostas esportivas");
-        projects.create("casino", "Cassino", "Cassino e cassino ao vivo");
-        projects.create("payments", "Pagamentos", "Depósitos, saques e bônus");
+        environments.create("dev", "Development", "Development environment", 0);
+        environments.create("stg", "Staging", "Pre-production", 1);
+        environments.create("prd", "Production", "Production — publishing requires approval", 2, true);
+        projects.create("sportsbook", "Sportsbook", "Sports betting");
+        projects.create("casino", "Casino", "Casino and live casino");
+        projects.create("payments", "Payments", "Deposits, withdrawals and bonuses");
 
-        attributes.create(new AttributeCommand("id", AttributeDatatype.STRING, "Identificador do jogador", true, true, List.of(), false));
-        attributes.create(new AttributeCommand("country", AttributeDatatype.STRING, "País (ISO 3166)", false, false, List.of(), false));
-        attributes.create(new AttributeCommand("platform", AttributeDatatype.ENUM, "Plataforma", false, false,
+        attributes.create(new AttributeCommand("id", AttributeDatatype.STRING, "Player identifier", true, true, List.of(), false));
+        attributes.create(new AttributeCommand("country", AttributeDatatype.STRING, "Country (ISO 3166)", false, false, List.of(), false));
+        attributes.create(new AttributeCommand("platform", AttributeDatatype.ENUM, "Platform", false, false,
                 List.of("web", "ios", "android"), false));
-        attributes.create(new AttributeCommand("appVersion", AttributeDatatype.STRING, "Versão do app", false, false, List.of(), false));
-        attributes.create(new AttributeCommand("vipLevel", AttributeDatatype.NUMBER, "Nível VIP (0-5)", false, false, List.of(), false));
-        attributes.create(new AttributeCommand("cpf", AttributeDatatype.STRING, "CPF do jogador (dado pessoal)", false, true, List.of(), false));
+        attributes.create(new AttributeCommand("appVersion", AttributeDatatype.STRING, "App version", false, false, List.of(), false));
+        attributes.create(new AttributeCommand("vipLevel", AttributeDatatype.NUMBER, "VIP level (0-5)", false, false, List.of(), false));
+        attributes.create(new AttributeCommand("cpf", AttributeDatatype.STRING, "Player CPF (personal data)", false, true, List.of(), false));
 
-        savedGroups.create(new SavedGroupCommand("beta-testers", "Beta testers", "Jogadores do programa beta",
+        savedGroups.create(new SavedGroupCommand("beta-testers", "Beta testers", "Players in the beta program",
                 SavedGroupType.LIST, "id", List.of(TextNode.valueOf("user-001"), TextNode.valueOf("user-002"),
                 TextNode.valueOf("user-123")), null));
-        savedGroups.create(new SavedGroupCommand("mobile-users", "Usuários mobile", "iOS e Android",
+        savedGroups.create(new SavedGroupCommand("mobile-users", "Mobile users", "iOS and Android",
                 SavedGroupType.CONDITION, null, null, json("{\"platform\":{\"$in\":[\"ios\",\"android\"]}}")));
-        savedGroups.create(new SavedGroupCommand("vips", "VIPs", "Nível VIP 3 ou maior",
+        savedGroups.create(new SavedGroupCommand("vips", "VIPs", "VIP level 3 or higher",
                 SavedGroupType.CONDITION, null, null, json("{\"vipLevel\":{\"$gte\":3}}")));
     }
 
     private void seedFeatures() {
-        feature("new-checkout", "payments", ValueType.BOOLEAN, BooleanNode.FALSE, "Novo fluxo de checkout de depósito",
+        feature("new-checkout", "payments", ValueType.BOOLEAN, BooleanNode.FALSE, "New deposit checkout flow",
                 List.of("checkout", "deposito"),
                 "prd", List.of(
-                        force("Beta testers sempre veem", null, List.of("beta-testers"), BooleanNode.TRUE),
-                        new RolloutRule(null, "Rollout gradual no BR (app ≥ 2.3)", true,
+                        force("Beta testers always see it", null, List.of("beta-testers"), BooleanNode.TRUE),
+                        new RolloutRule(null, "Gradual rollout in BR (app ≥ 2.3)", true,
                                 json("{\"country\":\"BR\",\"appVersion\":{\"$vgte\":\"2.3.0\"}}"), List.of(), BooleanNode.TRUE, 0.25, "id")),
-                "stg", List.of(force("Todos em staging", null, List.of(), BooleanNode.TRUE)));
-        feature("bet-builder", "sportsbook", ValueType.BOOLEAN, BooleanNode.FALSE, "Criar Aposta (bet builder)",
+                "stg", List.of(force("Everyone in staging", null, List.of(), BooleanNode.TRUE)));
+        feature("bet-builder", "sportsbook", ValueType.BOOLEAN, BooleanNode.FALSE, "Bet builder",
                 List.of("sportsbook"),
-                "prd", List.of(new RolloutRule(null, "10% dos jogadores", true, null, List.of(), BooleanNode.TRUE, 0.10, "id")),
-                "stg", List.of(force("Todos em staging", null, List.of(), BooleanNode.TRUE)));
-        feature("casino-lobby-layout", "casino", ValueType.STRING, TextNode.valueOf("grid"), "Layout do lobby do cassino",
+                "prd", List.of(new RolloutRule(null, "10% of players", true, null, List.of(), BooleanNode.TRUE, 0.10, "id")),
+                "stg", List.of(force("Everyone in staging", null, List.of(), BooleanNode.TRUE)));
+        feature("casino-lobby-layout", "casino", ValueType.STRING, TextNode.valueOf("grid"), "Casino lobby layout",
                 List.of("casino", "ux"),
-                "prd", List.of(force("Carrossel no mobile", null, List.of("mobile-users"), TextNode.valueOf("carousel"))),
+                "prd", List.of(force("Carousel on mobile", null, List.of("mobile-users"), TextNode.valueOf("carousel"))),
                 "stg", List.of());
-        feature("max-bet-limit", "sportsbook", ValueType.NUMBER, IntNode.valueOf(1000), "Limite máximo de aposta (R$)",
+        feature("max-bet-limit", "sportsbook", ValueType.NUMBER, IntNode.valueOf(1000), "Maximum bet limit (BRL)",
                 List.of("risco"),
-                "prd", List.of(force("Limite VIP", null, List.of("vips"), IntNode.valueOf(50000))),
+                "prd", List.of(force("VIP limit", null, List.of("vips"), IntNode.valueOf(50000))),
                 "stg", List.of());
-        feature("welcome-bonus", "payments", ValueType.JSON, json("{\"enabled\":false}"), "Configuração do bônus de boas-vindas",
+        feature("welcome-bonus", "payments", ValueType.JSON, json("{\"enabled\":false}"), "Welcome bonus configuration",
                 List.of("bonus"),
-                "prd", List.of(force("Campanha BR", json("{\"country\":\"BR\"}"), List.of(),
+                "prd", List.of(force("BR campaign", json("{\"country\":\"BR\"}"), List.of(),
                         json("{\"enabled\":true,\"percent\":100,\"maxAmount\":500,\"rollover\":10}"))),
                 "stg", List.of());
-        features.create("dark-mode", null, ValueType.BOOLEAN, BooleanNode.FALSE, "Tema escuro no app (ainda em desenvolvimento)",
+        features.create("dark-mode", null, ValueType.BOOLEAN, BooleanNode.FALSE, "Dark theme in the app (still in development)",
                 "squad-app", List.of("ux"));
     }
 

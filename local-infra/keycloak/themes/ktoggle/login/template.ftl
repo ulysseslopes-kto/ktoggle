@@ -1,6 +1,6 @@
 <#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false>
 <!DOCTYPE html>
-<html class="${properties.kcHtmlClass!}" lang="${(locale.currentLanguageTag)!'pt-BR'}">
+<html class="${properties.kcHtmlClass!}" lang="${(locale.currentLanguageTag)!'en'}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -22,11 +22,11 @@
             <span class="kt-wordmark">kto<span class="kt-red">ggle</span></span>
         </div>
         <div class="kt-pitch">
-            <p class="kt-headline">Feature flags<br><span class="kt-red">auditáveis</span></p>
+            <p class="kt-headline">Auditable<br><span class="kt-red">feature flags</span></p>
             <ul>
-                <li>Toda alteração passa por draft e revisão</li>
-                <li>Configuração publicada em bundles assinados e imutáveis</li>
-                <li>Qualquer decisão pode ser reproduzida</li>
+                <li>Every change goes through a draft and a review</li>
+                <li>Configuration published as signed, immutable bundles</li>
+                <li>Any decision can be replayed</li>
             </ul>
         </div>
         <p class="kt-foot">KTO · ktoggle</p>

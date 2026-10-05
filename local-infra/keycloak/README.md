@@ -8,7 +8,7 @@ file is allowlisted in `.gitleaks.toml`.
 | `admin.local` | `admin` | `ktoggle-admin` |
 | `editor.local` | `editor` | `ktoggle-editor` |
 | `viewer.local` | `viewer` | `ktoggle-viewer` |
-| `approver.local` | `approver` | `ktoggle-approver` (aprova drafts; não edita) |
+| `approver.local` | `approver` | `ktoggle-approver` (approves drafts; cannot edit) |
 
 Get a token for the admin API (direct grant is enabled for the local `ktoggle-ui` client only):
 

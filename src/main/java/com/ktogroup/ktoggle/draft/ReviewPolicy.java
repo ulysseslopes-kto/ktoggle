@@ -67,16 +67,16 @@ public class ReviewPolicy {
     public List<String> publishBlockers(FeatureDraft draft, MergeResult merge, List<String> reviewEnvironments) {
         List<String> blockers = new ArrayList<>();
         if (!draft.status().isOpen()) {
-            blockers.add("O draft está " + draft.status());
+            blockers.add("The draft is " + draft.status());
         }
         if (!merge.conflicts().isEmpty()) {
-            blockers.add("Conflitos com a versão no ar: " + merge.conflicts());
+            blockers.add("Conflicts with the live version: " + merge.conflicts());
         }
         if (merge.changes().isEmpty()) {
-            blockers.add("Nenhuma alteração em relação à versão no ar");
+            blockers.add("No changes compared to the live version");
         }
         if (!reviewEnvironments.isEmpty() && draft.status() != DraftStatus.APPROVED) {
-            blockers.add("Requer aprovação (afeta " + String.join(", ", reviewEnvironments) + ")");
+            blockers.add("Requires approval (affects " + String.join(", ", reviewEnvironments) + ")");
         }
         return blockers;
     }

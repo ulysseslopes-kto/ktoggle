@@ -1,101 +1,117 @@
 # ktoggle
 
-O serviço de feature flags da KTO. O objetivo é substituir o GrowthBook mantendo **os mesmos SDKs** e garantir que
-**toda decisão seja auditável de forma confiável, independente da versão**.
+KTO's feature flag service. It keeps **the same SDKs as GrowthBook** and makes **every decision reliably auditable,
+regardless of version**.
 
-## Por que ktoggle
+## Why ktoggle
 
-- **Compatível com os SDKs do GrowthBook.** `GET /api/features/{clientKey}` e `GET /sub/{clientKey}` (SSE) usam o
-  mesmo formato do GrowthBook. Para migrar um consumidor, basta trocar o host da API.
-- **Configuração publicada como bundles imutáveis.**
-  - Cada publicação gera um JSON canônico (RFC 8785), identificado pelo seu SHA-256 e assinado com ECDSA P-256
-    (AWS KMS em stg/prd).
-  - O bundle fica no Postgres (append-only, protegido por trigger) e é copiado para S3 com Object Lock (WORM).
-  - A sequência de ativações de cada client key é encadeada por hash, então qualquer adulteração é detectável.
-- **Replay determinístico.** `POST /admin/v1/replay` reproduz qualquer decisão a partir do bundle em que ela foi
-  tomada, usando o próprio `growthbook-sdk-java`. Nada que mudou depois interfere no resultado.
-- **Log de entregas.** Registra qual bundle cada client key recebeu e quando, sem exigir mudança nos consumidores.
-- **Log de decisões (opt-in) com LGPD.** Os consumidores podem enviar suas decisões pelo callback de uso de
-  features do SDK. Atributos sensíveis nunca são guardados em claro: o ktoggle guarda apenas um HMAC deles.
-- **Auditoria do control plane.** Cada mudança registra quem fez, o quê, quando e por quê (header `X-Ktoggle-Reason`),
-  numa trilha encadeada por hash e verificável com `GET /admin/v1/audit/verify`.
+- **Compatible with the GrowthBook SDKs.** `GET /api/features/{clientKey}` and `GET /sub/{clientKey}` (SSE) use
+  GrowthBook's format. To move a consumer over, change the API host.
+- **Drafts and four-eyes review.** Every change to an existing feature is staged in a draft and reviewed as a diff.
+  Protected environments require an approval from someone else. Who may approve is configurable. Admins can publish
+  in an emergency with a mandatory reason, and that publication is flagged in the audit trail.
+- **Configuration published as immutable bundles.**
+  - Each publication produces canonical JSON (RFC 8785), identified by its SHA-256 and signed with ECDSA P-256
+    (AWS KMS in stg/prd).
+  - Bundles are stored in Postgres (append-only, enforced by triggers) and copied to S3 with Object Lock (WORM).
+  - The activations of each client key are hash-chained, so any tampering is detectable.
+- **Deterministic replay.** `POST /admin/v1/replay` reproduces any decision from the bundle it was made with, using
+  the official `growthbook-sdk-java`. Nothing that changed afterwards affects the result.
+- **Delivery log.** Records which bundle each client key received and when, without changing consumers.
+- **Opt-in decision log, privacy-aware (LGPD).** Consumers may send their decisions through the SDK's feature-usage
+  callback. Personal data is never stored in clear: ktoggle keeps only an HMAC of it.
+- **Control-plane audit trail.** Every change records who, what, when and why (`X-Ktoggle-Reason` header), in a
+  hash-chained trail that can be verified with `GET /admin/v1/audit/verify`.
 
 ```mermaid
 flowchart LR
-    UI[ktoggle-ui / Admin API] -->|mudança| SVC[Serviços de domínio]
-    SVC -->|mesma transação| AUD[(audit_log<br/>hash-chain)]
+    UI[ktoggle-ui / Admin API] -->|draft| DR[Drafts + review]
+    DR -->|publish| SVC[Domain services]
+    SVC -->|same transaction| AUD[(audit_log<br/>hash-chain)]
     SVC -->|after commit| PUB[BundlePublisher]
     PUB -->|JCS + SHA-256 + ECDSA| B[(bundle<br/>append-only)]
     PUB --> ACT[(bundle_activation<br/>hash-chain)]
     B -.-> S3[(S3 Object Lock)]
-    PUB -->|Redis pub/sub| REG[ActiveBundleRegistry<br/>verifica antes de servir]
+    PUB -->|Redis pub/sub| REG[ActiveBundleRegistry<br/>verifies before serving]
     REG --> API["/api/features/{key}"]
     REG --> SSE["/sub/{key} (SSE)"]
-    API --> SDK[SDKs GrowthBook]
+    API --> SDK[GrowthBook SDKs]
     SSE --> SDK
     SDK -.->|opt-in| DEC["/api/decisions/{key}"]
 ```
 
-## Rodando localmente
+## Running it
+
+**Full demo, only Docker needed.** Clone `ktoggle-ui` next to this repository, then:
+
+```bash
+docker compose --profile app up -d --build     # UI http://localhost:5173 — sign in as admin.local / admin
+docker compose --profile app down -v           # stop and reset the demo data
+```
+
+**Development.** Run the infrastructure in Docker and the apps from your IDE or the terminal:
 
 ```bash
 docker compose up -d                                              # Postgres :5434, Redis :6390, Keycloak :8180
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local,demo      # API :8090 (o perfil demo popula dados fictícios)
-cd ../ktoggle-ui && npm install && npm run dev                    # UI :5173 — login admin.local / admin
-# Swagger: http://localhost:8090/swagger-ui.html  (usuários de dev: local-infra/keycloak/README.md)
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local,demo      # API :8090 (the demo profile seeds sample data)
+cd ../ktoggle-ui && npm install && npm run dev                    # UI :5173
+# Swagger: http://localhost:8090/swagger-ui.html  (dev users: local-infra/keycloak/README.md)
 ```
 
-Roteiro sugerido para a demonstração:
-1. **Features → `new-checkout` → Produção:** mostre as regras (beta testers + rollout de 25% no BR) e o painel
-   "Testar feature".
-2. **Draft e aprovação (quatro olhos):** como `editor.local`, altere uma regra em Produção. Um draft é aberto e nada
-   muda para os SDKs. Em "Revisar e publicar", veja o diff e clique em "Solicitar revisão". Depois, como
-   `approver.local`, aprove na página **Revisões**. De volta como `editor.local`, publique. Em **Configurações**,
-   mostre quem aprova e quais ambientes exigem aprovação.
-3. **SDK playground:** conecte `Demo · Web (produção)`. Em outra aba, ligue ou altere uma flag e veja a mudança chegar
-   via SSE em menos de 1 segundo.
-4. **Conexões de SDK:** mostre o bundle ativo com hash e assinatura verificados, a cadeia íntegra e um rollback com
-   motivo.
-5. **Audit log:** mostre a trilha encadeada (quem, o quê, quando e por quê) e o indicador de integridade.
-6. **Replay:** reproduza uma decisão a partir de um bundle antigo e mostre que o resultado não muda, mesmo depois de a
-   configuração atual mudar.
+Suggested demo script:
+1. **Features → `new-checkout` → Production:** show the rules (beta testers plus a 25% rollout in BR) and the
+   "Test feature" panel.
+2. **Draft and approval (four eyes):**
+   - As `editor.local`, change a rule in Production. A draft opens and nothing changes for the SDKs.
+   - In "Review & publish", show the diff and click "Request review".
+   - As `approver.local`, approve it on the **Reviews** page.
+   - As `editor.local` again, publish it.
+   - In **Settings**, show who can approve and which environments require approval.
+3. **SDK playground:** connect `Demo · App (staging)`. In another tab, publish a change in Staging and watch it arrive
+   over SSE in under a second.
+4. **SDK connections:** show the active bundle with its verified hash and signature, the verified chain and a rollback
+   with a reason.
+5. **Audit log:** show the hash-chained trail (who, what, when and why) and the integrity indicator.
+6. **Replay:** replay a decision from an old bundle and show that the result does not change after the current
+   configuration changed.
 
-Um fluxo mínimo, autenticado como `admin.local` (veja como obter o token em `local-infra/keycloak/README.md`):
+A minimal API flow as `admin.local` (see `local-infra/keycloak/README.md` for getting a token):
 
 ```bash
 H="Authorization: Bearer $TOKEN"; J="Content-Type: application/json"; API=http://localhost:8090/admin/v1
-curl -sH "$H" -H "$J" $API/environments -d '{"key":"prd","name":"Produção"}'
-curl -sH "$H" -H "$J" $API/attributes   -d '{"key":"country","datatype":"STRING","pii":false}'
-curl -sH "$H" -H "$J" $API/sdk-connections -d '{"name":"player-service","environmentKey":"prd"}'   # -> clientKey
-curl -sH "$H" -H "$J" $API/features -d '{"key":"new-checkout","valueType":"BOOLEAN","defaultValue":false}'
-curl -sX PUT -H "$H" -H "$J" -H "X-Ktoggle-Reason: piloto BR" $API/features/new-checkout/environments/prd \
+curl -sH "$H" -H "$J" $API/features -d '{"key":"my-flag","valueType":"BOOLEAN","defaultValue":false}'
+curl -sH "$H" -H "$J" $API/features/my-flag/drafts -d '{"title":"Turn on in staging"}'          # -> draft id + version
+curl -sX PUT -H "$H" -H "$J" $API/drafts/<draftId>/environments/stg \
   -d '{"enabled":true,"version":0,"rules":[{"type":"force","enabled":true,"condition":{"country":"BR"},"value":true}]}'
-curl -s http://localhost:8090/api/features/<clientKey>          # payload GrowthBook + bundleHash
-curl -N http://localhost:8090/sub/<clientKey>                    # SSE
+curl -sX POST -H "$H" -H "X-Ktoggle-Reason: pilot in BR" $API/drafts/<draftId>/publish
+curl -s http://localhost:8090/api/features/sdk-demostg00001        # GrowthBook payload + bundleHash
+curl -N http://localhost:8090/sub/sdk-demostg00001                  # SSE
 ```
 
-## Testando com um SDK do GrowthBook
+## Testing with a GrowthBook SDK
 
-Qualquer SDK oficial do GrowthBook pode apontar para o ktoggle local: basta usar `apiHost=http://localhost:8090` e
-o `clientKey` criado na conexão de SDK. O ktoggle é um produto independente e, por enquanto, não está integrado a
-nenhum outro serviço da KTO.
+Any official GrowthBook SDK can point at the local ktoggle: set `apiHost=http://localhost:8090` and use the
+`clientKey` of an SDK connection. ktoggle is a standalone product and is not integrated with any other KTO service
+yet.
 
-## Endpoints principais
+## Main endpoints
 
-| Área | Endpoint |
+| Area | Endpoints |
 |---|---|
 | SDK | `GET /api/features/{clientKey}`, `GET /sub/{clientKey}`, `POST /api/decisions/{clientKey}` |
-| Features | `/admin/v1/features` (CRUD, `/environments/{env}`, `/toggle`, `/archive`, `/revisions`, `/restore`) |
-| Catálogo | `/admin/v1/{projects,environments,attributes,saved-groups,sdk-connections}` |
+| Features | `/admin/v1/features` (create, list, get, `/revisions`) |
+| Drafts | `/admin/v1/features/{key}/drafts`, `/admin/v1/drafts/{id}` (`/environments/{env}`, `/metadata`, `/request-review`, `/approve`, `/request-changes`, `/comments`, `/rebase`, `/publish`, `/discard`), `/admin/v1/settings/review` |
+| Catalog | `/admin/v1/{projects,environments,attributes,saved-groups,sdk-connections}` |
 | Bundles | `/admin/v1/bundles/{hash}`, `/admin/v1/sdk-connections/{ck}/{bundles,activations,activations/at,activations/verify,deliveries}`, rollback `POST .../bundles/{hash}/activate`, `POST .../unpin` |
-| Auditoria | `/admin/v1/audit`, `/admin/v1/audit/verify`, `/admin/v1/decisions`, `/admin/v1/decisions/{id}/verify-attributes` |
-| Avaliação | `POST /admin/v1/simulate`, `POST /admin/v1/replay`, `POST /admin/v1/replay/at` |
+| Audit | `/admin/v1/audit`, `/admin/v1/audit/verify`, `/admin/v1/decisions`, `/admin/v1/decisions/{id}/verify-attributes` |
+| Evaluation | `POST /admin/v1/simulate`, `POST /admin/v1/replay`, `POST /admin/v1/replay/at` |
 
 ## Roadmap
 
-- **Backend (pronto):** flags + targeting, drafts com revisão e aprovação configurável, bundles auditáveis, replay, log de entregas e de decisões.
-- **Em andamento:** UI administrativa (`ktoggle-ui`) para demonstração local completa.
-- **A decidir depois da demonstração:** regras de experimento, regras agendadas, prerequisites,
-  payload criptografado e a forma de levar o ktoggle para dentro da empresa.
+- **Done:** flags and targeting, drafts with configurable review and approval, auditable bundles, replay, delivery and
+  decision logs, admin UI (`ktoggle-ui`), one-command demo.
+- **Next:** experiment rules (A/B), prerequisites, scheduled rules, "any"/"none" saved-group matching, encrypted
+  payloads and remote evaluation, API tokens, notifications, per-project permissions.
+- **After the evaluation:** how ktoggle is rolled out inside the company.
 
-Veja o [guia de desenvolvimento](docs/DEVELOPMENT.md) para as convenções e os invariantes do código.
+See the [development guide](docs/DEVELOPMENT.md) for conventions and code invariants.

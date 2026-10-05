@@ -6,10 +6,9 @@
   "loginTheme": "ktoggle",
   "internationalizationEnabled": true,
   "supportedLocales": [
-    "pt-BR",
     "en"
   ],
-  "defaultLocale": "pt-BR",
+  "defaultLocale": "en",
   "rememberMe": true,
   "roles": {
     "realm": [
@@ -27,7 +26,7 @@
       },
       {
         "name": "ktoggle-approver",
-        "description": "Pode aprovar drafts (quando listado nas configurações de revisão)"
+        "description": "May approve drafts (when listed in the review settings)"
       }
     ]
   },

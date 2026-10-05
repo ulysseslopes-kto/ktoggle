@@ -89,7 +89,7 @@ public class DraftService {
     public FeatureDraft revertTo(String featureKey, int revision) {
         Feature live = featureService.get(featureKey);
         FeatureSnapshot snapshot = featureService.revision(featureKey, revision).snapshot();
-        return create(live, snapshot, "Reverter para a revisão #" + revision);
+        return create(live, snapshot, "Revert to revision #" + revision);
     }
 
     @Transactional
@@ -106,7 +106,7 @@ public class DraftService {
         Map<String, EnvironmentSettings> environments = new HashMap<>(draft.proposed().environments());
         environments.put(environmentKey, new EnvironmentSettings(enabled, rules));
         FeatureSnapshot proposed = featureService.validate(draft.proposed().valueType(), withEnvironments(draft.proposed(), environments));
-        return touch(draft, proposed, "Ambiente %s: %s, %d regra(s)".formatted(environmentKey, enabled ? "ligado" : "desligado",
+        return touch(draft, proposed, "Environment %s: %s, %d rule(s)".formatted(environmentKey, enabled ? "on" : "off",
                 proposed.environments().get(environmentKey).rules().size()));
     }
 
@@ -117,7 +117,7 @@ public class DraftService {
         FeatureSnapshot p = draft.proposed();
         FeatureSnapshot proposed = featureService.validate(p.valueType(), new FeatureSnapshot(p.key(), projectKey, p.valueType(),
                 defaultValue, description, owner, tags == null ? List.of() : tags, archived, p.environments()));
-        return touch(draft, proposed, "Configurações gerais alteradas");
+        return touch(draft, proposed, "General settings changed");
     }
 
     @Transactional
@@ -137,8 +137,8 @@ public class DraftService {
         FeatureSnapshot base = featureService.revision(draft.featureKey(), draft.baseRevision()).snapshot();
         FeatureSnapshot resolved = merger.resolve(base, live.snapshot(), draft.proposed(), keepDraft);
         FeatureDraft rebased = draft.withBaseRevision(live.revision());
-        return touch(rebased, resolved, "Atualizado com a revisão #%d no ar (%s nos conflitos)"
-                .formatted(live.revision(), keepDraft ? "mantendo o draft" : "mantendo o que está no ar"), Type.REBASED);
+        return touch(rebased, resolved, "Updated with live revision #%d (%s on conflicts)"
+                .formatted(live.revision(), keepDraft ? "keeping the draft" : "keeping what is live"), Type.REBASED);
     }
 
     // ---- Review --------------------------------------------------------------------------------
@@ -228,7 +228,7 @@ public class DraftService {
         FeatureDraft done = persistence.save(draft.withStatus(DraftStatus.PUBLISHED).withPublishedRevision(published.revision())
                 .withUpdatedBy(context.actor()).withUpdatedAt(Ids.now(clock)));
         event(done, bypassed ? Type.BYPASS_PUBLISHED : Type.PUBLISHED,
-                "Revisão #%d%s".formatted(published.revision(), context.reason() == null ? "" : " — " + context.reason()));
+                "Revision #%d%s".formatted(published.revision(), context.reason() == null ? "" : " — " + context.reason()));
         return done;
     }
 
@@ -282,7 +282,7 @@ public class DraftService {
                 .withUpdatedBy(currentUser.username()).withUpdatedAt(Ids.now(clock)));
         event(saved, type, summary);
         if (resetReview && status == DraftStatus.APPROVED) {
-            event(saved, Type.REVIEW_RESET, "Alterado após a aprovação: nova revisão necessária");
+            event(saved, Type.REVIEW_RESET, "Changed after approval: a new review is required");
         }
         return saved;
     }
