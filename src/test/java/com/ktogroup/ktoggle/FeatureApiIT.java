@@ -248,6 +248,18 @@ class FeatureApiIT {
                 "proposed", Map.of("enabled", true, "rules", List.of(Map.of("type", "force", "enabled", true, "value", "x")))), 400);
         assertThat(invalidProposal.path("messageCode").asText()).isEqualTo("INVALID_VALUE");
 
+        // a whole draft: its default value applies too, not only its rules
+        Map<String, Object> draft = new java.util.HashMap<>(Map.of("valueType", "BOOLEAN", "defaultValue", true, "tags", List.of(),
+                "environments", Map.of(environment, Map.of("enabled", true, "rules", List.of()))));
+        JsonNode draftDefault = admin.postJson("/admin/v1/simulate", Map.of("featureKey", feature, "environmentKey", environment,
+                "attributes", Map.of(attribute, "PT"), "proposedFeature", draft), 200);
+        assertThat(draftDefault.path("value").asBoolean()).isTrue();
+        assertThat(draftDefault.path("source").asText()).isEqualTo("defaultValue");
+        draft.put("defaultValue", "x");
+        JsonNode invalidDraft = admin.postJson("/admin/v1/simulate", Map.of("featureKey", feature, "environmentKey", environment,
+                "proposedFeature", draft), 400);
+        assertThat(invalidDraft.path("messageCode").asText()).isEqualTo("INVALID_VALUE");
+
         admin.postJson("/admin/v1/simulate", Map.of("featureKey", feature, "environmentKey", unique("missing")), 404);
         admin.postJson("/admin/v1/simulate", Map.of("featureKey", unique("missing"), "environmentKey", environment), 404);
         admin.postJson("/admin/v1/simulate", Map.of("featureKey", " ", "environmentKey", environment), 400);

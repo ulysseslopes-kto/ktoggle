@@ -5,6 +5,7 @@ import com.ktogroup.ktoggle.evaluation.EvaluationResult;
 import com.ktogroup.ktoggle.evaluation.EvaluationService;
 import com.ktogroup.ktoggle.evaluation.EvaluationService.ReplayResult;
 import com.ktogroup.ktoggle.feature.EnvironmentSettings;
+import com.ktogroup.ktoggle.feature.FeatureSnapshot;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -29,7 +30,7 @@ public class EvaluationController {
     @PostMapping("/simulate")
     public EvaluationResult simulate(@Valid @RequestBody SimulateRequest request) {
         return evaluationService.simulate(request.featureKey(), request.environmentKey(), request.attributes(), request.proposed(),
-                request.at());
+                request.proposedFeature(), request.at());
     }
 
     @Operation(summary = "Reproduce a past decision from an immutable bundle")
@@ -44,9 +45,12 @@ public class EvaluationController {
         return evaluationService.replayAt(request.clientKey(), request.instant(), request.featureKey(), request.attributes());
     }
 
-    /** @param proposed optional unsaved environment settings to test before saving them */
+    /**
+     * @param proposed        optional unsaved environment settings to test before saving them
+     * @param proposedFeature optional whole feature content (a draft): default value, prerequisites and environments
+     */
     public record SimulateRequest(@NotBlank String featureKey, @NotBlank String environmentKey, JsonNode attributes,
-                                  EnvironmentSettings proposed, Instant at) {
+                                  EnvironmentSettings proposed, FeatureSnapshot proposedFeature, Instant at) {
     }
 
     public record ReplayRequest(@NotBlank String bundleHash, @NotBlank String featureKey, JsonNode attributes) {

@@ -109,6 +109,6 @@ class EvaluationServiceTest {
     void simulation_of_an_unknown_environment_fails_before_touching_the_feature() {
         org.mockito.Mockito.doThrow(new NotFoundException("Environment", "nope")).when(environmentService).requireExists("nope");
 
-        assertThatThrownBy(() -> service.simulate("checkout", "nope", null, null, null)).isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.simulate("checkout", "nope", null, null, null, null)).isInstanceOf(NotFoundException.class);
     }
 }

@@ -12,6 +12,7 @@ import com.ktogroup.ktoggle.environment.EnvironmentService;
 import com.ktogroup.ktoggle.feature.EnvironmentSettings;
 import com.ktogroup.ktoggle.feature.Feature;
 import com.ktogroup.ktoggle.feature.FeatureService;
+import com.ktogroup.ktoggle.feature.FeatureSnapshot;
 import com.ktogroup.ktoggle.feature.RuleValidator;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupService;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
@@ -28,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * <ul>
  *   <li><b>simulate</b>: "what would this user get?" against the current configuration — or a proposed
- *   environment setting not saved yet — compiled exactly as it would be published.</li>
+ *   feature content (a draft) or environment setting not saved yet — compiled exactly as it would be published.</li>
  *   <li><b>replay</b>: "what did this user get?" against an immutable, verified bundle, independent of anything
  *   that changed since.</li>
  * </ul>
@@ -50,9 +51,14 @@ public class EvaluationService {
 
     @Transactional(readOnly = true)
     public EvaluationResult simulate(String featureKey, String environmentKey, JsonNode attributes,
-                                     EnvironmentSettings proposed, Instant at) {
+                                     EnvironmentSettings proposed, FeatureSnapshot proposedFeature, Instant at) {
         environmentService.requireExists(environmentKey);
         Feature feature = featureService.get(featureKey);
+        if (proposedFeature != null) {
+            FeatureSnapshot draft = featureService.validate(feature.valueType(), proposedFeature.withKey(feature.key()));
+            feature = feature.withDefaultValue(draft.defaultValue()).withPrerequisites(draft.prerequisites())
+                    .withEnvironments(draft.environments());
+        }
         if (proposed != null) {
             Map<String, EnvironmentSettings> environments = new HashMap<>(feature.environments());
             environments.put(environmentKey, new EnvironmentSettings(proposed.enabled(), ruleValidator.validate(
