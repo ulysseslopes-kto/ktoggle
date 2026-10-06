@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ktogroup.ktoggle.webhook.WebhookDelivery;
 import com.ktogroup.ktoggle.webhook.WebhookDispatcher;
+import com.ktogroup.ktoggle.webhook.WebhookPersistencePort;
 import com.ktogroup.ktoggle.webhook.WebhookSignature;
 import com.ktogroup.ktoggle.ztest.AdminApi;
 import com.ktogroup.ktoggle.ztest.Fixtures;
@@ -12,10 +14,12 @@ import com.ktogroup.ktoggle.ztest.IntegrationTest;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +36,8 @@ class WebhookIT {
     private ObjectMapper objectMapper;
     @Autowired
     private WebhookDispatcher dispatcher;
+    @Autowired
+    private WebhookPersistencePort persistence;
 
     private AdminApi admin;
     private HttpServer receiver;
@@ -122,6 +128,25 @@ class WebhookIT {
         admin.postJson("/admin/v1/webhooks", Map.of("name", "x", "url", url(), "events", List.of()), 400);
         assertThat(admin.getJson("/admin/v1/webhooks/events")).extracting(e -> e.path("code").asText())
                 .contains("draft.published", "bundle.rolled_back").doesNotContain("webhook.test");
+    }
+
+    @Test
+    void a_claim_whose_lock_expired_and_was_taken_over_can_neither_send_nor_record_the_delivery() throws Exception {
+        String id = create(List.of("draft.published"), "GENERIC").path("webhook").path("id").asText();
+        admin.postJson("/admin/v1/webhooks/" + id + "/test", Map.of(), 202);
+        Instant now = Instant.now();
+        // locks already expired, so whatever else these claims pick up stays reclaimable by the dispatcher
+        UUID slow = UUID.randomUUID();
+        UUID delivery = persistence.claimDue(now, now.minusSeconds(1), slow, 100).stream()
+                .filter(d -> d.webhookId().toString().equals(id)).findFirst().orElseThrow().id();
+        UUID takeover = UUID.randomUUID();
+        assertThat(persistence.claimDue(now.plusMillis(1), now, takeover, 100)).extracting(WebhookDelivery::id).contains(delivery);
+
+        assertThat(persistence.renewLock(delivery, slow, now.plusSeconds(60))).as("the slow pod must not send it").isFalse();
+        assertThat(persistence.markFailed(delivery, slow, 500, "late", 1, now, false)).isFalse();
+        assertThat(persistence.markDelivered(delivery, slow, 200, now)).isFalse();
+        assertThat(persistence.markDelivered(delivery, takeover, 200, now)).isTrue();
+        assertThat(admin.getJson("/admin/v1/webhooks/" + id + "/deliveries").get(0).path("status").asText()).isEqualTo("DELIVERED");
     }
 
     private JsonNode create(List<String> events, String format) throws Exception {

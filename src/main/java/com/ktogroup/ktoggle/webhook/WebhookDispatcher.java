@@ -24,7 +24,10 @@ import org.springframework.stereotype.Component;
  * Delivers the outbox. Every pod may run it at the same time: rows are claimed with {@code FOR UPDATE SKIP LOCKED},
  * so each delivery is sent by one pod. A failed delivery is retried with exponential backoff (30s, 1m, 2m, 4m, 8m)
  * and given up after {@value #MAX_ATTEMPTS} attempts; a pod that dies mid-send leaves the row to be reclaimed once its
- * lock expires. Delivery is therefore at-least-once: receivers should de-duplicate on {@code X-Ktoggle-Delivery}.
+ * lock expires. Each claim has its own token: a delivery's lock is renewed right before it is sent, and only the claim
+ * that still owns it may send it or record its outcome, so a slow batch never races a pod that reclaimed its rows.
+ * Delivery is still at-least-once (a pod may die after sending): receivers should de-duplicate on
+ * {@code X-Ktoggle-Delivery}.
  */
 @Slf4j
 @Component
@@ -63,10 +66,17 @@ public class WebhookDispatcher {
     /** Sends every delivery that is due now; returns how many were attempted. */
     public int dispatchDue() {
         Instant now = Ids.now(clock);
-        List<WebhookDelivery> claimed = persistence.claimDue(now, now.plus(LOCK), BATCH);
+        UUID token = UUID.randomUUID();
+        List<WebhookDelivery> claimed = persistence.claimDue(now, now.plus(LOCK), token, BATCH);
         Map<UUID, Optional<Webhook>> webhooks = new HashMap<>();
         for (WebhookDelivery delivery : claimed) {
-            send(delivery, webhooks.computeIfAbsent(delivery.webhookId(), persistence::findById));
+            // the batch is sent one by one: each delivery gets a full lock window right before its own send, and is
+            // skipped if its lock expired meanwhile and another pod (or tick) took it over
+            if (!persistence.renewLock(delivery.id(), token, Ids.now(clock).plus(LOCK))) {
+                log.info("Webhook delivery {} was claimed again elsewhere; not sending it twice", delivery.id());
+                continue;
+            }
+            send(delivery, token, webhooks.computeIfAbsent(delivery.webhookId(), persistence::findById));
         }
         return claimed.size();
     }
@@ -90,10 +100,10 @@ public class WebhookDispatcher {
         }
     }
 
-    private void send(WebhookDelivery delivery, Optional<Webhook> target) {
+    private void send(WebhookDelivery delivery, UUID token, Optional<Webhook> target) {
         int attempts = delivery.attempts() + 1;
         if (target.isEmpty() || !target.get().enabled()) {
-            persistence.markFailed(delivery.id(), null, "Webhook disabled", attempts, Ids.now(clock), true);
+            persistence.markFailed(delivery.id(), token, null, "Webhook disabled", attempts, Ids.now(clock), true);
             return;
         }
         Webhook webhook = target.get();
@@ -111,7 +121,9 @@ public class WebhookDispatcher {
             headers.put(WebhookSignature.SIGNATURE_HEADER, WebhookSignature.sign(webhook.secret(), timestamp, body));
             status = transport.post(webhook.url(), headers, body);
             if (status >= 200 && status < 300) {
-                persistence.markDelivered(delivery.id(), status, Ids.now(clock));
+                if (!persistence.markDelivered(delivery.id(), token, status, Ids.now(clock))) {
+                    log.warn("Webhook delivery {} was sent but its claim had been lost; it may be sent again", delivery.id());
+                }
                 meterRegistry.counter("ktoggle.webhooks.deliveries", "result", "delivered").increment();
                 return;
             }
@@ -126,7 +138,7 @@ public class WebhookDispatcher {
         }
         boolean giveUp = attempts >= MAX_ATTEMPTS;
         Instant next = Ids.now(clock).plus(FIRST_RETRY.multipliedBy(1L << Math.min(attempts - 1, 10)));
-        persistence.markFailed(delivery.id(), status, error.length() > MAX_ERROR ? error.substring(0, MAX_ERROR) : error,
+        persistence.markFailed(delivery.id(), token, status, error.length() > MAX_ERROR ? error.substring(0, MAX_ERROR) : error,
                 attempts, next, giveUp);
         meterRegistry.counter("ktoggle.webhooks.deliveries", "result", giveUp ? "failed" : "retry").increment();
         log.warn("Webhook {} delivery {} attempt {} failed: {}{}", webhook.name(), delivery.id(), attempts, error,

@@ -81,9 +81,9 @@ public class WebhookJdbcAdapter implements WebhookPersistencePort {
 
     @Override
     @Transactional
-    public List<WebhookDelivery> claimDue(Instant now, Instant lockedUntil, int limit) {
+    public List<WebhookDelivery> claimDue(Instant now, Instant lockedUntil, UUID lockToken, int limit) {
         return jdbc.query("""
-                UPDATE webhook_delivery SET status = 'SENDING', locked_until = :lockedUntil
+                UPDATE webhook_delivery SET status = 'SENDING', locked_until = :lockedUntil, lock_token = :token
                 WHERE id IN (
                     SELECT id FROM webhook_delivery
                     WHERE (status IN ('PENDING', 'RETRY') AND next_attempt_at <= :now)
@@ -93,26 +93,38 @@ public class WebhookJdbcAdapter implements WebhookPersistencePort {
                     FOR UPDATE SKIP LOCKED)
                 RETURNING""" + " " + DELIVERY_COLUMNS,
                 new MapSqlParameterSource("now", timestamp(now)).addValue("lockedUntil", timestamp(lockedUntil))
-                        .addValue("limit", limit), this::delivery);
+                        .addValue("token", lockToken).addValue("limit", limit), this::delivery);
     }
 
     @Override
-    public void markDelivered(UUID id, int statusCode, Instant deliveredAt) {
-        jdbc.update("""
+    public boolean renewLock(UUID id, UUID lockToken, Instant lockedUntil) {
+        return jdbc.update("""
+                UPDATE webhook_delivery SET locked_until = :lockedUntil
+                WHERE id = :id AND status = 'SENDING' AND lock_token = :token""",
+                new MapSqlParameterSource("id", id).addValue("token", lockToken)
+                        .addValue("lockedUntil", timestamp(lockedUntil))) == 1;
+    }
+
+    @Override
+    public boolean markDelivered(UUID id, UUID lockToken, int statusCode, Instant deliveredAt) {
+        return jdbc.update("""
                 UPDATE webhook_delivery SET status = 'DELIVERED', attempts = attempts + 1, last_status_code = :code,
-                                            last_error = NULL, delivered_at = :at, locked_until = NULL
-                WHERE id = :id""", new MapSqlParameterSource("id", id).addValue("code", statusCode)
-                .addValue("at", timestamp(deliveredAt)));
+                                            last_error = NULL, delivered_at = :at, locked_until = NULL, lock_token = NULL
+                WHERE id = :id AND status = 'SENDING' AND lock_token = :token""",
+                new MapSqlParameterSource("id", id).addValue("token", lockToken).addValue("code", statusCode)
+                        .addValue("at", timestamp(deliveredAt))) == 1;
     }
 
     @Override
-    public void markFailed(UUID id, Integer statusCode, String error, int attempts, Instant nextAttemptAt, boolean giveUp) {
-        jdbc.update("""
+    public boolean markFailed(UUID id, UUID lockToken, Integer statusCode, String error, int attempts, Instant nextAttemptAt,
+                              boolean giveUp) {
+        return jdbc.update("""
                 UPDATE webhook_delivery SET status = :status, attempts = :attempts, last_status_code = :code, last_error = :error,
-                                            next_attempt_at = :next, locked_until = NULL
-                WHERE id = :id""", new MapSqlParameterSource("id", id).addValue("status", giveUp ? "FAILED" : "RETRY")
-                .addValue("attempts", attempts).addValue("code", statusCode).addValue("error", error)
-                .addValue("next", timestamp(nextAttemptAt)));
+                                            next_attempt_at = :next, locked_until = NULL, lock_token = NULL
+                WHERE id = :id AND status = 'SENDING' AND lock_token = :token""",
+                new MapSqlParameterSource("id", id).addValue("token", lockToken).addValue("status", giveUp ? "FAILED" : "RETRY")
+                        .addValue("attempts", attempts).addValue("code", statusCode).addValue("error", error)
+                        .addValue("next", timestamp(nextAttemptAt))) == 1;
     }
 
     @Override

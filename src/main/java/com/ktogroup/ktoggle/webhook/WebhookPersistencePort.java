@@ -22,13 +22,23 @@ public interface WebhookPersistencePort {
 
     /**
      * Claims up to {@code limit} due deliveries (pending, due for retry, or stuck in sending past their lock) for this
-     * caller, marking them {@code SENDING} until {@code lockedUntil}. Safe with several pods: rows are skipped, not waited on.
+     * caller, marking them {@code SENDING} under {@code lockToken} until {@code lockedUntil}. Safe with several pods: rows
+     * are skipped, not waited on.
      */
-    List<WebhookDelivery> claimDue(Instant now, Instant lockedUntil, int limit);
+    List<WebhookDelivery> claimDue(Instant now, Instant lockedUntil, UUID lockToken, int limit);
 
-    void markDelivered(UUID id, int statusCode, Instant deliveredAt);
+    /**
+     * Extends the lock of a delivery right before sending it; false when the claim was lost (the lock expired and the
+     * row was claimed again under another token), in which case it must not be sent.
+     */
+    boolean renewLock(UUID id, UUID lockToken, Instant lockedUntil);
 
-    void markFailed(UUID id, Integer statusCode, String error, int attempts, Instant nextAttemptAt, boolean giveUp);
+    /** False (nothing changed) when the claim was lost. */
+    boolean markDelivered(UUID id, UUID lockToken, int statusCode, Instant deliveredAt);
+
+    /** False (nothing changed) when the claim was lost. */
+    boolean markFailed(UUID id, UUID lockToken, Integer statusCode, String error, int attempts, Instant nextAttemptAt,
+                       boolean giveUp);
 
     List<WebhookDelivery> findDeliveries(UUID webhookId, int limit);
 
