@@ -3,7 +3,9 @@ package com.ktogroup.ktoggle.targeting;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ktogroup.ktoggle.commons.exception.MessageCode;
 import com.ktogroup.ktoggle.commons.exception.ValidationException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +27,8 @@ public class ConditionValidator {
     private static final Set<String> VERSION = Set.of("$veq", "$vne", "$vgt", "$vgte", "$vlt", "$vlte");
     private static final Set<String> ARRAY_ARG = Set.of("$in", "$nin", "$all");
     private static final Set<String> TYPES = Set.of("string", "number", "boolean", "array", "object", "null");
+    /** Patterns are matched against caller-supplied attributes (remote evaluation): keep them small. */
+    static final int MAX_REGEX_LENGTH = 256;
 
     /**
      * @param condition     the condition (null or {} means "always matches")
@@ -148,13 +152,72 @@ public class ConditionValidator {
             errors.add(path + ": must be a string");
             return;
         }
+        String regex = arg.asText();
+        if (regex.length() > MAX_REGEX_LENGTH) {
+            errors.add(path + ": regular expression longer than " + MAX_REGEX_LENGTH + " characters");
+            return;
+        }
         try {
-            Pattern.compile(arg.asText());
+            Pattern.compile(regex);
         } catch (PatternSyntaxException e) {
             errors.add(path + ": invalid regular expression (" + e.getDescription() + ")");
+            return;
+        }
+        if (hasNestedQuantifier(regex)) {
+            errors.add(path + ": nested quantifiers such as (a+)+ are not allowed (catastrophic backtracking); "
+                    + "remove the inner or the outer repetition");
         }
     }
 
+    /**
+     * Rejects an unboundedly repeated group that itself contains an unbounded repetition, e.g. {@code (a+)+},
+     * {@code (\w*x)*} or {@code (?:a|b+){2,}}: the classic shape of exponential backtracking. Rules run on attributes sent by callers
+     * (remote evaluation), so such patterns could burn the server's CPU. Heuristic on purpose: it does not try to prove
+     * a pattern safe, it refuses the dangerous shape.
+     */
+    static boolean hasNestedQuantifier(String regex) {
+        Deque<Boolean> groups = new ArrayDeque<>(); // per open group: contains an unbounded repetition
+        boolean inClass = false;
+        for (int i = 0; i < regex.length(); i++) {
+            char c = regex.charAt(i);
+            if (c == '\\') {
+                i++; // escaped character (or class shorthand such as \w): never a quantifier itself
+            } else if (inClass) {
+                inClass = c != ']';
+            } else if (c == '[') {
+                inClass = true;
+                if (i + 1 < regex.length() && regex.charAt(i + 1) == ']') {
+                    i++; // a leading ] is a literal
+                }
+            } else if (c == '(') {
+                groups.push(false);
+            } else if (c == ')' && !groups.isEmpty()) {
+                boolean innerRepeated = groups.pop();
+                boolean repeated = unboundedQuantifierAt(regex, i + 1);
+                if (innerRepeated && repeated) {
+                    return true;
+                }
+                if ((innerRepeated || repeated) && !groups.isEmpty()) {
+                    groups.pop();
+                    groups.push(true);
+                }
+            } else if ((c == '*' || c == '+' || (c == '{' && unboundedQuantifierAt(regex, i))) && !groups.isEmpty()) {
+                groups.pop();
+                groups.push(true);
+            }
+        }
+        return false;
+    }
+
+    /** {@code *}, {@code +} or {@code {n,}} at {@code i}. */
+    private static boolean unboundedQuantifierAt(String regex, int i) {
+        if (i >= regex.length()) {
+            return false;
+        }
+        char c = regex.charAt(i);
+        return c == '*' || c == '+' || (c == '{' && regex.indexOf('}', i) > 0
+                && regex.substring(i + 1, regex.indexOf('}', i)).matches("\\d+,"));
+    }
     private static void requireThat(boolean condition, String path, String message, List<String> errors) {
         if (!condition) {
             errors.add(path + ": " + message);

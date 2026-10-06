@@ -16,6 +16,9 @@ import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnectionService;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,16 +48,23 @@ public class ActiveBundleRegistry {
     private final ObjectMapper objectMapper;
     private final SseHub sseHub;
     private static final String PLAIN = "plain";
+    static final Duration UNKNOWN_TTL = Duration.ofSeconds(10);
+    private static final int MAX_UNKNOWN = 10_000;
 
     private final MeterRegistry meterRegistry;
     private final SdkConnectionService connections;
     private final ActivationNotifier notifier;
+    private final Clock clock;
     private final Map<String, ServedPayload> served = new ConcurrentHashMap<>();
+    /** Client keys without any activation, until when to answer "unknown" without asking the database. */
+    private final Map<String, Instant> unknown = new ConcurrentHashMap<>();
 
     public ActiveBundleRegistry(BundlePersistencePort bundles, BundleCodec codec, ObjectMapper objectMapper, SseHub sseHub,
-                                MeterRegistry meterRegistry, SdkConnectionService connections, ActivationNotifier notifier) {
+                                MeterRegistry meterRegistry, SdkConnectionService connections, ActivationNotifier notifier,
+                                Clock clock) {
         this.connections = connections;
         this.notifier = notifier;
+        this.clock = clock;
         this.bundles = bundles;
         this.codec = codec;
         this.objectMapper = objectMapper;
@@ -63,13 +73,30 @@ public class ActiveBundleRegistry {
         Gauge.builder("ktoggle.delivery.client_keys", served, Map::size).register(meterRegistry);
     }
 
-    /** Current payload of a client key, loading it on first use. Empty if the key has never been published. */
+    /**
+     * Current payload of a client key, loading it on first use. Empty if the key has never been published. Unknown keys
+     * are remembered for {@link #UNKNOWN_TTL} so public endpoints hit with random keys do not query the database every time.
+     */
     public Optional<ServedPayload> get(String clientKey) {
         ServedPayload current = served.get(clientKey);
         if (current != null) {
             return Optional.of(current);
         }
-        return bundles.findLastActivation(clientKey).flatMap(this::load);
+        Instant now = clock.instant();
+        Instant unknownUntil = unknown.get(clientKey);
+        if (unknownUntil != null && unknownUntil.isAfter(now)) {
+            return Optional.empty();
+        }
+        Optional<BundleActivation> activation = bundles.findLastActivation(clientKey);
+        if (activation.isEmpty()) {
+            if (unknown.size() >= MAX_UNKNOWN) {
+                unknown.clear();
+            }
+            unknown.put(clientKey, now.plus(UNKNOWN_TTL));
+            return Optional.empty();
+        }
+        unknown.remove(clientKey);
+        return activation.flatMap(this::load);
     }
 
     /** Encryption switched or key rotated: tell every pod (same channel as activations) to re-render and push. */
@@ -78,8 +105,10 @@ public class ActiveBundleRegistry {
         bundles.findLastActivation(event.clientKey()).ifPresent(a -> notifier.notifyActivated(a.clientKey(), a.bundleHash()));
     }
 
+    /** Reaches every pod; also forgets a cached miss, so a new connection is served as soon as its first bundle is live. */
     @EventListener
     public void onBundleActivated(BundleActivatedEvent event) {
+        unknown.remove(event.clientKey());
         bundles.findLastActivation(event.clientKey()).ifPresent(this::loadAndBroadcast);
     }
 

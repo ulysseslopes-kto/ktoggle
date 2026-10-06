@@ -77,6 +77,17 @@ class SseHubTest {
         assertThat(connections()).as("a removed subscriber is not counted twice").isEqualTo(1);
     }
 
+    @Test
+    void a_broadcast_between_registration_and_the_initial_send_is_never_followed_by_the_stale_payload() {
+        SseHub.Subscriber subscriber = hub.register("sdk-a", "js");
+        hub.broadcast(payload("sdk-a", "h2"));
+
+        hub.sendInitial(subscriber, payload("sdk-a", "h1"));
+
+        verify(recorder).record("sdk-a", "h2", DeliveryChannel.SSE, "js");
+        verify(recorder, never()).record("sdk-a", "h1", DeliveryChannel.SSE, "js");
+    }
+
     private double connections() {
         return meters.get("ktoggle.delivery.sse_connections").gauge().value();
     }

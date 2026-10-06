@@ -20,8 +20,14 @@ public record ServedPayload(String clientKey, String bundleHash, long activation
         this(clientKey, bundleHash, activationPosition, activatedAt, deliveryMode, body, null);
     }
 
+    /**
+     * The body depends on the bundle and on how it is delivered: turning encryption on or off, rotating the key or
+     * switching remote evaluation must change the ETag, or SDKs holding the old body would get a 304 and keep a body
+     * they can no longer use. The delivery mode carries the key fingerprint only, never the key.
+     */
     public String etag() {
-        return "\"" + bundleHash + "\"";
+        return SdkConnection.PLAIN.equals(deliveryMode) ? "\"" + bundleHash + "\""
+                : "\"" + bundleHash + "-" + deliveryMode.replace(':', '-') + "\"";
     }
 
     public boolean remoteEval() {

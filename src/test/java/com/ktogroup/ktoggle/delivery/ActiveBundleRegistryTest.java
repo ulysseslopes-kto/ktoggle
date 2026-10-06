@@ -18,6 +18,11 @@ import com.ktogroup.ktoggle.sdkconnection.SdkConnection;
 import com.ktogroup.ktoggle.sdkconnection.SdkConnectionService;
 import com.ktogroup.ktoggle.ztest.TestBundles;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -30,8 +35,9 @@ class ActiveBundleRegistryTest {
     private final SseHub sseHub = mock(SseHub.class);
     private final SimpleMeterRegistry meters = new SimpleMeterRegistry();
     private final SdkConnectionService connections = mock(SdkConnectionService.class);
+    private final MutableClock clock = new MutableClock(TestBundles.CREATED_AT);
     private final ActiveBundleRegistry registry = new ActiveBundleRegistry(persistence, testBundles.codec(),
-            testBundles.objectMapper(), sseHub, meters, connections, mock(ActivationNotifier.class));
+            testBundles.objectMapper(), sseHub, meters, connections, mock(ActivationNotifier.class), clock);
 
     @Test
     void a_verified_bundle_is_served_in_the_growthbook_response_shape() throws Exception {
@@ -73,6 +79,8 @@ class ActiveBundleRegistryTest {
 
         ServedPayload rerendered = registry.get("sdk-a").orElseThrow();
         assertThat(rerendered.deliveryMode()).isEqualTo(rotated.deliveryMode()).isNotEqualTo(served.deliveryMode());
+        assertThat(rerendered.etag()).as("a new key means a new body: no 304 with the old one")
+                .isNotEqualTo(served.etag()).doesNotContain(rotated.decryptionKey()).contains(bundle.hash());
         String encryptedFeatures = testBundles.objectMapper().readTree(rerendered.body()).path("encryptedFeatures").asText();
         assertThat(PayloadEncryption.decrypt(encryptedFeatures, rotated.decryptionKey())).contains("checkout");
         verify(sseHub).broadcast(rerendered);
@@ -198,10 +206,54 @@ class ActiveBundleRegistryTest {
         assertThat(meters.get("ktoggle.delivery.client_keys").gauge().value()).isEqualTo(1);
     }
 
+    @Test
+    void unknown_client_keys_are_remembered_briefly_and_forgotten_on_activation() {
+        when(persistence.findLastActivation("sdk-none")).thenReturn(Optional.empty());
+
+        assertThat(registry.get("sdk-none")).isEmpty();
+        assertThat(registry.get("sdk-none")).isEmpty();
+        verify(persistence, times(1)).findLastActivation("sdk-none");
+
+        clock.advance(ActiveBundleRegistry.UNKNOWN_TTL.plusSeconds(1));
+        assertThat(registry.get("sdk-none")).isEmpty();
+        verify(persistence, times(2)).findLastActivation("sdk-none");
+
+        Bundle bundle = publish("sdk-none", 1, true);
+        registry.onBundleActivated(new BundleActivatedEvent("sdk-none", bundle.hash()));
+        assertThat(registry.get("sdk-none")).as("a new connection is served right after its first activation").isPresent();
+    }
+
     private Bundle publish(String clientKey, long position, boolean featureDefault) {
         Bundle bundle = testBundles.bundle(clientKey, featureDefault);
         when(persistence.findLastActivation(clientKey)).thenReturn(Optional.of(TestBundles.activation(clientKey, position, bundle.hash(), null)));
         when(persistence.findByHash(bundle.hash())).thenReturn(Optional.of(bundle));
         return bundle;
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant now;
+
+        MutableClock(Instant now) {
+            this.now = now;
+        }
+
+        void advance(Duration duration) {
+            now = now.plus(duration);
+        }
+
+        @Override
+        public ZoneOffset getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return now;
+        }
     }
 }

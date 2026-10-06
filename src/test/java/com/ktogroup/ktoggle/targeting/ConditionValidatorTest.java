@@ -57,6 +57,30 @@ class ConditionValidatorTest {
         assertThatThrownBy(() -> validator.validate(json(condition), ATTRIBUTES)).isInstanceOf(ValidationException.class);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"(a+)+$", "^(\\w*x)*y", "(?:a|b+){2,}", "((ab)*c)+", "([a-z]+)*@"})
+    void rejects_regular_expressions_prone_to_catastrophic_backtracking(String regex) {
+        assertThatThrownBy(() -> validator.validate(regexCondition(regex), ATTRIBUTES))
+                .isInstanceOfSatisfying(ValidationException.class,
+                        e -> assertThat(e.getData().toString()).contains("nested quantifiers"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"^abc", "^[\\w.+-]+@[\\w-]+\\.[a-z]{2,}$", "(ab)+c", "(a|b)*", "[(a+)]+", "\\(a+\\)+", "^(BR|PT)-\\d+$"})
+    void accepts_regular_expressions_without_nested_repetition(String regex) {
+        assertThatCode(() -> validator.validate(regexCondition(regex), ATTRIBUTES)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejects_overly_long_regular_expressions() {
+        assertThatThrownBy(() -> validator.validate(regexCondition("a".repeat(ConditionValidator.MAX_REGEX_LENGTH + 1)), ATTRIBUTES))
+                .isInstanceOfSatisfying(ValidationException.class, e -> assertThat(e.getData().toString()).contains("longer than"));
+    }
+
+    private JsonNode regexCondition(String regex) {
+        return objectMapper.createObjectNode().set("userId", objectMapper.createObjectNode().put("$regex", regex));
+    }
+
     @Test
     void reports_every_error_with_its_path() {
         assertThatThrownBy(() -> validator.validate(json("{\"nope\":1,\"age\":{\"$bogus\":1}}"), ATTRIBUTES))

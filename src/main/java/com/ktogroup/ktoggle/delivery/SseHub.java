@@ -36,21 +36,33 @@ public class SseHub {
     }
 
     public SseEmitter subscribe(ServedPayload current, String sdkHint) {
+        Subscriber subscriber = register(current.clientKey(), sdkHint);
+        sendInitial(subscriber, current);
+        return subscriber.emitter;
+    }
+
+    /** Registered before the initial send, so no activation in between is missed. */
+    Subscriber register(String clientKey, String sdkHint) {
         SseEmitter emitter = new SseEmitter(0L);
-        Subscriber subscriber = new Subscriber(emitter, sdkHint);
-        subscribers.computeIfAbsent(current.clientKey(), k -> ConcurrentHashMap.newKeySet()).add(subscriber);
+        Subscriber subscriber = new Subscriber(clientKey, emitter, sdkHint);
+        subscribers.computeIfAbsent(clientKey, k -> ConcurrentHashMap.newKeySet()).add(subscriber);
         connections.incrementAndGet();
-        Runnable remove = () -> {
-            Set<Subscriber> set = subscribers.get(current.clientKey());
-            if (set != null && set.remove(subscriber)) {
-                connections.decrementAndGet();
+        emitter.onCompletion(() -> remove(subscriber));
+        emitter.onTimeout(() -> remove(subscriber));
+        emitter.onError(e -> remove(subscriber));
+        return subscriber;
+    }
+
+    /**
+     * {@code current} was read before the subscriber was registered: if a broadcast reached the subscriber meanwhile,
+     * it carried a newer payload, and sending {@code current} after it would roll the client back.
+     */
+    void sendInitial(Subscriber subscriber, ServedPayload current) {
+        synchronized (subscriber) {
+            if (!subscriber.updated) {
+                send(subscriber, current);
             }
-        };
-        emitter.onCompletion(remove);
-        emitter.onTimeout(remove);
-        emitter.onError(e -> remove.run());
-        send(subscriber, current, remove);
-        return emitter;
+        }
     }
 
     public void broadcast(ServedPayload payload) {
@@ -59,11 +71,10 @@ public class SseHub {
             return;
         }
         for (Subscriber subscriber : set) {
-            send(subscriber, payload, () -> {
-                if (set.remove(subscriber)) {
-                    connections.decrementAndGet();
-                }
-            });
+            synchronized (subscriber) {
+                subscriber.updated = true;
+                send(subscriber, payload);
+            }
         }
     }
 
@@ -71,30 +82,46 @@ public class SseHub {
     public void heartbeat() {
         subscribers.forEach((clientKey, set) -> set.forEach(subscriber -> {
             try {
-                subscriber.emitter().send(SseEmitter.event().comment("heartbeat"));
+                subscriber.emitter.send(SseEmitter.event().comment("heartbeat"));
             } catch (IOException | IllegalStateException e) {
-                if (set.remove(subscriber)) {
-                    connections.decrementAndGet();
-                }
+                remove(subscriber);
             }
         }));
     }
 
-    private void send(Subscriber subscriber, ServedPayload payload, Runnable onFailure) {
+    private void send(Subscriber subscriber, ServedPayload payload) {
         try {
             if (payload.remoteEval()) {
-                subscriber.emitter().send(SseEmitter.event().name(FEATURES_UPDATED_EVENT)
+                subscriber.emitter.send(SseEmitter.event().name(FEATURES_UPDATED_EVENT)
                         .data("{\"bundleHash\":\"" + payload.bundleHash() + "\"}", MediaType.APPLICATION_JSON));
             } else {
-                subscriber.emitter().send(SseEmitter.event().name(FEATURES_EVENT).data(payload.body(), MediaType.APPLICATION_JSON));
+                subscriber.emitter.send(SseEmitter.event().name(FEATURES_EVENT).data(payload.body(), MediaType.APPLICATION_JSON));
             }
-            deliveryRecorder.record(payload.clientKey(), payload.bundleHash(), DeliveryChannel.SSE, subscriber.sdkHint());
+            deliveryRecorder.record(payload.clientKey(), payload.bundleHash(), DeliveryChannel.SSE, subscriber.sdkHint);
         } catch (IOException | IllegalStateException e) {
             log.debug("SSE subscriber for {} is gone: {}", payload.clientKey(), e.getMessage());
-            onFailure.run();
+            remove(subscriber);
         }
     }
 
-    private record Subscriber(SseEmitter emitter, String sdkHint) {
+    private void remove(Subscriber subscriber) {
+        Set<Subscriber> set = subscribers.get(subscriber.clientKey);
+        if (set != null && set.remove(subscriber)) {
+            connections.decrementAndGet();
+        }
+    }
+
+    /** {@code updated}: a broadcast was sent to it (guarded by the subscriber's monitor). */
+    static final class Subscriber {
+        private final String clientKey;
+        private final SseEmitter emitter;
+        private final String sdkHint;
+        private boolean updated;
+
+        private Subscriber(String clientKey, SseEmitter emitter, String sdkHint) {
+            this.clientKey = clientKey;
+            this.emitter = emitter;
+            this.sdkHint = sdkHint;
+        }
     }
 }

@@ -50,7 +50,7 @@ public class SdkApiController {
     private final RemoteEvaluator remoteEvaluator;
     private final ObjectMapper objectMapper;
 
-    @Operation(summary = "Feature payload for a client key (ETag = bundle hash, 304 when unchanged)")
+    @Operation(summary = "Feature payload for a client key (ETag = bundle hash and delivery mode, 304 when unchanged)")
     @GetMapping(value = "/api/features/{clientKey}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> features(@PathVariable String clientKey,
                                            @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,

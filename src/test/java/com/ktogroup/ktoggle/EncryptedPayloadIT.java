@@ -54,7 +54,7 @@ class EncryptedPayloadIT {
         JsonNode afterRotation = fetch(clientKey);
         assertThat(sdkIsOn(afterRotation, newKey, feature)).isTrue();
         assertThat(mvc.perform(get("/api/features/" + clientKey)).andReturn().getResponse().getHeader("ETag"))
-                .as("same bundle, only the delivery changed").isEqualTo(etag);
+                .as("same bundle, but a new key: clients must not get a 304 with the old body").isNotEqualTo(etag);
         assertThat(decrypts(afterRotation, key)).as("the old key no longer works").isFalse();
 
         admin.putJson("/admin/v1/sdk-connections/" + clientKey, Map.of("name", "app", "encryptPayload", false,
