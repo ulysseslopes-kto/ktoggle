@@ -2,6 +2,7 @@ package com.ktogroup.ktoggle.decision;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -26,13 +27,24 @@ class DecisionPartitionMaintainerTest {
     private final DecisionPartitionMaintainer maintainer = new DecisionPartitionMaintainer(persistence, properties, clock);
 
     @Test
-    void startup_creates_the_current_month_and_the_next_two_without_dropping_anything() {
+    void startup_creates_the_previous_month_the_current_one_and_the_next_two_without_dropping_anything() {
         maintainer.onStartup();
 
         ArgumentCaptor<YearMonth> months = ArgumentCaptor.forClass(YearMonth.class);
-        verify(persistence, times(3)).ensureMonthlyPartition(months.capture());
-        assertThat(months.getAllValues()).containsExactly(YearMonth.of(2026, 11), YearMonth.of(2026, 12), YearMonth.of(2027, 1));
+        verify(persistence, times(4)).ensureMonthlyPartition(months.capture());
+        assertThat(months.getAllValues()).as("late events (up to maxPastAge) may belong to the previous month")
+                .containsExactly(YearMonth.of(2026, 10), YearMonth.of(2026, 11), YearMonth.of(2026, 12), YearMonth.of(2027, 1));
         verify(persistence, never()).dropPartitionsBefore(any());
+    }
+
+    @Test
+    void a_month_that_cannot_be_created_does_not_prevent_the_others() {
+        doThrow(new IllegalStateException("default partition holds rows of that month"))
+                .when(persistence).ensureMonthlyPartition(YearMonth.of(2026, 10));
+
+        maintainer.onStartup();
+
+        verify(persistence).ensureMonthlyPartition(YearMonth.of(2027, 1));
     }
 
     @Test

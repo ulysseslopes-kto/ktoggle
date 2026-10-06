@@ -197,9 +197,43 @@ class DecisionIngestServiceTest {
 
         service.flush();
 
-        verify(persistence, times(2)).insertBatch(anyList());
+        verify(persistence, times(4)).insertBatch(anyList());
         assertThat(meters.get("ktoggle.decisions.dropped").counter().count()).isEqualTo(3);
         assertThat(stored).isEmpty();
+    }
+
+    @Test
+    void one_event_the_database_rejects_does_not_cost_the_rest_of_its_batch() {
+        doAnswer(invocation -> {
+            List<DecisionEvent> batch = invocation.getArgument(0);
+            if (batch.stream().anyMatch(e -> "bad".equals(e.featureKey()))) {
+                throw new IllegalStateException("unsupported Unicode escape sequence");
+            }
+            stored.addAll(batch);
+            return null;
+        }).when(persistence).insertBatch(anyList());
+        service.ingest("sdk-a", List.of(report(HASH, "bad", NOW, null), report()));
+
+        service.flush();
+
+        assertThat(stored).singleElement().satisfies(e -> assertThat(e.featureKey()).isNotEqualTo("bad"));
+        assertThat(meters.get("ktoggle.decisions.dropped").counter().count()).isEqualTo(1);
+    }
+
+    @Test
+    void the_one_by_one_retry_gives_up_when_the_database_itself_is_down() {
+        doThrow(new IllegalStateException("db down")).when(persistence).insertBatch(anyList());
+        DecisionIngestService large = service(100, 50, 50);
+        List<DecisionReport> reports = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            reports.add(report());
+        }
+        large.ingest("sdk-a", reports);
+
+        large.flush();
+
+        verify(persistence, times(1 + DecisionIngestService.MAX_CONSECUTIVE_FAILURES)).insertBatch(anyList());
+        assertThat(meters.get("ktoggle.decisions.dropped").counter().count()).isEqualTo(20);
     }
 
     @Test

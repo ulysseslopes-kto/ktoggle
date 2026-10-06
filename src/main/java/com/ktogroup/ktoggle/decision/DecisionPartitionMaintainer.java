@@ -13,8 +13,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Keeps monthly partitions of {@code decision_event} ahead of time (current month + 2) and drops the ones older
- * than the retention period. Dropping whole partitions is the cheapest way to enforce retention.
+ * Keeps monthly partitions of {@code decision_event} ahead of time (previous month to current + 2) and drops the ones
+ * older than the retention period. Dropping whole partitions is the cheapest way to enforce retention.
  */
 @Slf4j
 @Component
@@ -43,10 +43,19 @@ public class DecisionPartitionMaintainer {
         }
     }
 
+    /**
+     * From the previous month (events are accepted up to {@code maxPastAge} old, which early in a month falls in the
+     * previous one) to {@link #MONTHS_AHEAD} ahead. One month failing (e.g. the default partition already holds rows of
+     * that month) does not prevent the others; such rows stay in the default partition.
+     */
     private void ensurePartitions() {
         YearMonth current = YearMonth.now(clock.withZone(ZoneOffset.UTC));
-        for (int i = 0; i <= MONTHS_AHEAD; i++) {
-            persistence.ensureMonthlyPartition(current.plusMonths(i));
+        for (int i = -1; i <= MONTHS_AHEAD; i++) {
+            try {
+                persistence.ensureMonthlyPartition(current.plusMonths(i));
+            } catch (RuntimeException e) {
+                log.warn("Could not create the decision partition for {}: {}", current.plusMonths(i), e.getMessage());
+            }
         }
     }
 }

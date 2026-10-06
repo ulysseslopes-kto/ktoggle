@@ -43,6 +43,7 @@ public class DecisionIngestService {
     private static final Pattern HASH = Pattern.compile("^[0-9a-f]{64}$");
     private static final int MAX_KEY_LENGTH = 150;
     private static final Duration ALLOWLIST_TTL = Duration.ofMinutes(1);
+    static final int MAX_CONSECUTIVE_FAILURES = 5;
 
     private final DecisionEventPersistencePort persistence;
     private final ActiveBundleRegistry registry;
@@ -114,10 +115,42 @@ public class DecisionIngestService {
             try {
                 persistence.insertBatch(batch);
             } catch (RuntimeException e) {
-                dropped.increment(batch.size());
-                log.error("Failed to persist {} decision events (dropped)", batch.size(), e);
+                if (batch.size() == 1) {
+                    dropped.increment();
+                    log.error("Failed to persist a decision event (dropped)", e);
+                } else {
+                    log.warn("Failed to persist {} decision events as a batch, retrying one by one: {}", batch.size(), e.getMessage());
+                    insertOneByOne(batch);
+                }
             }
             batch.clear();
+        }
+    }
+
+    /**
+     * One bad event must not cost the whole batch. Gives up after {@link #MAX_CONSECUTIVE_FAILURES} failures in a row:
+     * the database itself is then the problem, and retrying every event would only stall the flush.
+     */
+    private void insertOneByOne(List<DecisionEvent> batch) {
+        int failed = 0;
+        int consecutive = 0;
+        for (int i = 0; i < batch.size(); i++) {
+            if (consecutive >= MAX_CONSECUTIVE_FAILURES) {
+                failed += batch.size() - i;
+                break;
+            }
+            try {
+                persistence.insertBatch(List.of(batch.get(i)));
+                consecutive = 0;
+            } catch (RuntimeException e) {
+                failed++;
+                consecutive++;
+                log.debug("Decision event {} rejected: {}", batch.get(i).eventId(), e.getMessage());
+            }
+        }
+        if (failed > 0) {
+            dropped.increment(failed);
+            log.error("Failed to persist {} of {} decision events (dropped)", failed, batch.size());
         }
     }
 
