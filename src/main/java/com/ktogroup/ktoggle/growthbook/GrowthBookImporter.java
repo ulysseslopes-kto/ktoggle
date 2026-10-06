@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Imports an existing GrowthBook (read through its REST API) into ktoggle: projects, environments, attributes, saved
@@ -62,6 +63,7 @@ public class GrowthBookImporter {
     private final FeatureService features;
     private final SdkConnectionService connections;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactions;
 
     /**
      * @param environmentMapping GrowthBook environment id &rarr; ktoggle environment key; unmapped environments are
@@ -198,7 +200,12 @@ public class GrowthBookImporter {
             String clientKey = gb.path("key").asText();
             Optional<SdkConnection> current = connections.find(clientKey);
             if (current.isPresent()) {
-                report.add("sdkConnection", clientKey, Action.UNCHANGED, gb.path("name").asText());
+                List<String> notes = new ArrayList<>(List.of(gb.path("name").asText()));
+                if (gb.path("encryptPayload").asBoolean(false) && !current.get().encryptPayload()) {
+                    notes.add("GrowthBook encrypts this payload but ktoggle serves it in clear text: enable encryption "
+                            + "with GrowthBook's key before switching consumers");
+                }
+                report.add("sdkConnection", clientKey, Action.UNCHANGED, notes);
                 continue;
             }
             String environment = environmentKeys.get(gb.path("environment").asText());
@@ -218,14 +225,16 @@ public class GrowthBookImporter {
             if (remote) {
                 notes.add("remote evaluation enabled");
             }
-            apply(report, "sdkConnection", clientKey, Action.CREATE, notes, dryRun, () -> {
+            // one transaction: a connection that cannot get GrowthBook's key (or remote evaluation) is not created at all,
+            // rather than left serving clear text and reported UNCHANGED by every later run
+            apply(report, "sdkConnection", clientKey, Action.CREATE, notes, dryRun, () -> transactions.executeWithoutResult(tx -> {
                 SdkConnection created = connections.create(clientKey, gb.path("name").asText(clientKey), environment, projectList);
                 if (encrypt) {
                     connections.useDecryptionKey(clientKey, gb.path("encryptionKey").asText());
                 } else if (remote) {
                     connections.update(clientKey, created.name(), created.projectKeys(), null, true, created.version());
                 }
-            });
+            }));
         }
     }
 

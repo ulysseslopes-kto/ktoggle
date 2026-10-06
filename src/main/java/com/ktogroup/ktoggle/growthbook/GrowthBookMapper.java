@@ -22,6 +22,7 @@ import com.ktogroup.ktoggle.savedgroup.SavedGroupService.SavedGroupCommand;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupType;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -140,6 +141,27 @@ public class GrowthBookMapper {
         }
         JsonNode phases = experiment.path("phases");
         JsonNode phase = phases.isEmpty() ? objectMapper.createObjectNode() : phases.get(phases.size() - 1);
+        JsonNode namespace = phase.path("namespace");
+        if (namespace.isObject() && !namespace.isEmpty() && namespace.path("enabled").asBoolean(true)) {
+            throw new IllegalArgumentException("namespaces are not supported");
+        }
+        // the phase restricts who enters the experiment on top of the rule: both must apply
+        Targeting phaseGroups = targeting(phase);
+        if (!groups.any().isEmpty() && !phaseGroups.any().isEmpty()) {
+            throw new IllegalArgumentException("several 'any' saved-group blocks are not supported");
+        }
+        Targeting allGroups = new Targeting(concat(groups.all(), phaseGroups.all()), concat(groups.any(), phaseGroups.any()),
+                concat(groups.none(), phaseGroups.none()));
+        List<Prerequisite> allPrerequisites = new ArrayList<>(prerequisites);
+        for (Prerequisite p : prerequisites(phase.path("prerequisites"))) {
+            Optional<Prerequisite> same = allPrerequisites.stream().filter(q -> q.featureKey().equals(p.featureKey())).findFirst();
+            if (same.isEmpty()) {
+                allPrerequisites.add(p);
+            } else if (!same.get().condition().equals(p.condition())) {
+                throw new IllegalArgumentException("the rule and the experiment phase have different prerequisites on '"
+                        + p.featureKey() + "'");
+            }
+        }
         Map<String, JsonNode> valueByVariation = new LinkedHashMap<>();
         gb.path("variations").forEach(v -> valueByVariation.put(v.path("variationId").asText(), value(type, v.path("value"))));
         Map<String, Double> weightByVariation = new LinkedHashMap<>();
@@ -159,10 +181,16 @@ public class GrowthBookMapper {
             throw new IllegalArgumentException("both the rule and the experiment phase have a condition");
         }
         return new ExperimentRule(id, description == null ? blankToNull(experiment.path("name").asText(null)) : description, enabled,
-                condition == null ? phaseCondition : condition, groups.all(), experiment.path("trackingKey").asText(experimentId),
+                condition == null ? phaseCondition : condition, allGroups.all(), experiment.path("trackingKey").asText(experimentId),
                 experiment.path("hashAttribute").asText("id"), phase.path("coverage").asDouble(1), variations,
-                experiment.path("hashVersion").asInt(1), blankToNull(phase.path("seed").asText(null)), schedule, prerequisites,
-                groups.any(), groups.none());
+                experiment.path("hashVersion").asInt(1), blankToNull(phase.path("seed").asText(null)), schedule, allPrerequisites,
+                allGroups.any(), allGroups.none());
+    }
+
+    private static List<String> concat(List<String> a, List<String> b) {
+        List<String> all = new ArrayList<>(a);
+        b.stream().filter(value -> !all.contains(value)).forEach(all::add);
+        return all;
     }
 
     public Optional<AttributeCommand> attribute(JsonNode gb, List<String> warnings) {
@@ -275,7 +303,13 @@ public class GrowthBookMapper {
             if (!s.hasNonNull("timestamp")) {
                 continue;
             }
-            Instant at = Instant.parse(s.path("timestamp").asText());
+            Instant at;
+            try {
+                at = Instant.parse(s.path("timestamp").asText());
+            } catch (DateTimeParseException e) {
+                // reported as a skipped rule (IllegalArgumentException), not as an unsupported feature
+                throw new IllegalArgumentException("invalid schedule timestamp '" + s.path("timestamp").asText() + "'");
+            }
             if (s.path("enabled").asBoolean()) {
                 start = at;
             } else {

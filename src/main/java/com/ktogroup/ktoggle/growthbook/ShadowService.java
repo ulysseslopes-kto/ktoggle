@@ -172,7 +172,7 @@ public class ShadowService {
     }
 
     /** GrowthBook connections with encryption: the key comes from its REST API (needs the secret key). */
-    private JsonNode decrypted(JsonNode payload, String key) {
+    JsonNode decrypted(JsonNode payload, String key) {
         if (!payload.hasNonNull("encryptedFeatures")) {
             return payload;
         }
@@ -184,6 +184,11 @@ public class ShadowService {
             ObjectNode copy = payload.deepCopy();
             copy.set("features", objectMapper.readTree(PayloadEncryption.decrypt(payload.path("encryptedFeatures").asText(), key)
                     .strip()));
+            // rules referencing saved groups ($inGroup) need them, or every such rule would look divergent
+            if (payload.hasNonNull("encryptedSavedGroups")) {
+                copy.set("savedGroups", objectMapper.readTree(PayloadEncryption.decrypt(
+                        payload.path("encryptedSavedGroups").asText(), key).strip()));
+            }
             return copy;
         } catch (Exception e) {
             throw new IllegalStateException("Could not decrypt GrowthBook's payload: " + e.getMessage(), e);

@@ -103,6 +103,45 @@ class GrowthBookMapperTest {
                 Map.of(), id -> Optional.empty())).hasMessageContaining("unsupported value type");
     }
 
+    @Test
+    void experiment_refs_keep_the_phase_targeting_and_report_namespaces() throws IOException {
+        JsonNode experiment = objectMapper.readTree("""
+                {"id": "exp_1", "status": "running", "trackingKey": "copy", "variations": [
+                   {"variationId": "v0", "key": "0"}, {"variationId": "v1", "key": "1"}],
+                 "phases": [{"coverage": 1, "trafficSplit": [{"variationId": "v0", "weight": 0.5}, {"variationId": "v1", "weight": 0.5}],
+                   "savedGroupTargeting": [{"matchType": "all", "savedGroups": ["vips"]}, {"matchType": "none", "savedGroups": ["banned"]}],
+                   "prerequisites": [{"id": "parent", "condition": "{\\"value\\": true}"}]}]}""");
+        JsonNode rule = objectMapper.readTree("""
+                {"type": "experiment-ref", "id": "r1", "experimentId": "exp_1",
+                 "variations": [{"variationId": "v0", "value": "a"}, {"variationId": "v1", "value": "b"}]}""");
+
+        ExperimentRule mapped = (ExperimentRule) mapper.rule(rule, ValueType.STRING, id -> Optional.of(experiment));
+
+        assertThat(mapped.savedGroups()).as("restricted as in GrowthBook, not open to everyone").containsExactly("vips");
+        assertThat(mapped.savedGroupsNone()).containsExactly("banned");
+        assertThat(mapped.prerequisites()).singleElement().satisfies(p -> {
+            assertThat(p.featureKey()).isEqualTo("parent");
+            assertThat(p.condition().path("value").asBoolean()).isTrue();
+        });
+
+        ObjectNode namespaced = experiment.deepCopy();
+        ((ObjectNode) namespaced.path("phases").get(0)).set("namespace", objectMapper.readTree("""
+                {"namespaceId": "ns", "range": [0, 0.5]}"""));
+        assertThatThrownBy(() -> mapper.rule(rule, ValueType.STRING, id -> Optional.of(namespaced)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("namespaces");
+    }
+
+    @Test
+    void an_invalid_schedule_timestamp_skips_the_rule_not_the_feature() throws IOException {
+        ObjectNode feature = (ObjectNode) fixture("features").path("features").get(0).deepCopy();
+        ObjectNode rule = ((ObjectNode) feature.path("environments").path("production").path("rules").get(0));
+        rule.set("scheduleRules", objectMapper.readTree("[{\"enabled\": true, \"timestamp\": \"tomorrow\"}]"));
+
+        FeaturePlan plan = mapper.feature(feature, Map.of("production", "production"), id -> Optional.empty());
+
+        assertThat(plan.warnings()).anyMatch(w -> w.contains("invalid schedule timestamp"));
+    }
+
     private JsonNode fixture(String name) throws IOException {
         try (InputStream in = getClass().getResourceAsStream("/growthbook/" + name + ".json")) {
             return objectMapper.readTree(in);
