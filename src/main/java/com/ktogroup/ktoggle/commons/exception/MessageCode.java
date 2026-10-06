@@ -16,5 +16,6 @@ public enum MessageCode {
     REVIEW_REQUIRED,
     NOTHING_TO_PUBLISH,
     NOT_ALLOWED,
+    UPSTREAM_ERROR,
     UNEXPECTED_ERROR
 }

@@ -139,6 +139,31 @@ public class SdkConnectionService {
         return saved;
     }
 
+    /**
+     * Turns encryption on with a given key: used when importing a GrowthBook connection, so apps that already decrypt
+     * with GrowthBook's key keep working when they switch host.
+     */
+    @Transactional
+    public SdkConnection useDecryptionKey(String clientKey, String base64Key) {
+        byte[] key;
+        try {
+            key = Base64.getDecoder().decode(base64Key);
+        } catch (IllegalArgumentException e) {
+            throw ValidationException.of("decryption key must be base64");
+        }
+        if (key.length != 16 && key.length != 24 && key.length != 32) {
+            throw ValidationException.of("decryption key must be an AES key (16, 24 or 32 bytes)");
+        }
+        SdkConnection current = get(clientKey);
+        if (current.remoteEval()) {
+            throw ValidationException.of("Remote evaluation and payload encryption cannot be combined");
+        }
+        SdkConnection saved = persistence.save(current.withEncryptPayload(true).withDecryptionKey(base64Key).withUpdatedAt(Ids.now(clock)));
+        auditService.record(changeContextProvider.current(), AuditAction.UPDATE, EntityType.SDK_CONNECTION, clientKey, current, saved);
+        events.publishEvent(new DeliverySettingsChangedEvent(clientKey));
+        return saved;
+    }
+
     /** The key to configure in this connection's SDKs (admin only). */
     @Transactional(readOnly = true)
     public String decryptionKey(String clientKey) {

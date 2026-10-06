@@ -14,5 +14,6 @@ public enum AuditAction {
     PUBLISH_BUNDLE,
     ROLLBACK_BUNDLE,
     UNPIN_BUNDLE,
-    REVOKE
+    REVOKE,
+    IMPORT
 }

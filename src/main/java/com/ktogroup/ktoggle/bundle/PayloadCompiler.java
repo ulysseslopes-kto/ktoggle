@@ -96,6 +96,9 @@ public class PayloadCompiler {
                 compiled.set("force", rollout.value());
                 compiled.put("coverage", rollout.coverage());
                 compiled.put("hashAttribute", rollout.hashAttribute());
+                if (rollout.seed() != null && !rollout.seed().isBlank()) {
+                    compiled.put("seed", rollout.seed());
+                }
             }
             case ExperimentRule experiment -> compileExperiment(compiled, experiment);
         }

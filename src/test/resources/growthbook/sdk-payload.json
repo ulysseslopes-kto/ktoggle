@@ -1,0 +1,130 @@
+{
+ "status": 200,
+ "features": {
+  "gb-new-checkout": {
+   "defaultValue": false,
+   "rules": [
+    {
+     "condition": {
+      "id": {
+       "$in": [
+        "tester-1",
+        "tester-2"
+       ]
+      }
+     },
+     "force": true
+    },
+    {
+     "condition": {
+      "country": "BR"
+     },
+     "force": true,
+     "coverage": 0.3,
+     "hashAttribute": "id",
+     "seed": "fr_3xnappjdmuvyjawv"
+    }
+   ]
+  },
+  "gb-lobby-layout": {
+   "defaultValue": "grid",
+   "rules": [
+    {
+     "condition": {
+      "$and": [
+       {
+        "country": {
+         "$in": [
+          "BR",
+          "PT"
+         ]
+        }
+       },
+       {
+        "vipLevel": {
+         "$gte": 3
+        }
+       }
+      ]
+     },
+     "force": "carousel"
+    }
+   ]
+  },
+  "gb-max-bet": {
+   "defaultValue": 1000,
+   "rules": [
+    {
+     "condition": {
+      "vipLevel": {
+       "$gte": 3
+      }
+     },
+     "force": 50000
+    },
+    {
+     "condition": {
+      "$and": [
+       {
+        "country": "XX"
+       },
+       {
+        "$not": {
+         "vipLevel": {
+          "$gte": 3
+         }
+        }
+       }
+      ]
+     },
+     "force": 0
+    }
+   ]
+  },
+  "gb-welcome-bonus": {
+   "defaultValue": {
+    "enabled": false
+   },
+   "rules": [
+    {
+     "condition": {
+      "country": "BR"
+     },
+     "force": {
+      "enabled": true,
+      "percent": 100
+     }
+    }
+   ]
+  },
+  "gb-button-copy": {
+   "defaultValue": "Deposit",
+   "rules": [
+    {
+     "variations": [
+      "Deposit",
+      "Add funds"
+     ],
+     "coverage": 1,
+     "weights": [
+      0.5,
+      0.5
+     ],
+     "meta": [
+      {
+       "key": "0",
+       "name": "Control"
+      },
+      {
+       "key": "1",
+       "name": "Add funds"
+      }
+     ],
+     "key": "gb-button-copy",
+     "hashAttribute": "id"
+    }
+   ]
+  }
+ },
+ "dateUpdated": "2026-10-06T00:58:19.223Z"
+}

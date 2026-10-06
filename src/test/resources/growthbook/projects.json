@@ -1,0 +1,20 @@
+{
+ "projects": [
+  {
+   "id": "prj_2Cfk4LCnLMTuWRYc5xFY3S",
+   "name": "My First Project",
+   "description": "",
+   "publicId": "my-first-project",
+   "allowTargeting": true,
+   "dateCreated": "2026-10-06T00:44:39.275Z",
+   "dateUpdated": "2026-10-06T00:44:39.275Z",
+   "settings": {}
+  }
+ ],
+ "limit": 10,
+ "offset": 0,
+ "count": 1,
+ "total": 1,
+ "hasMore": false,
+ "nextOffset": null
+}

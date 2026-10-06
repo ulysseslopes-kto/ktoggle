@@ -54,6 +54,8 @@ public class SecurityConfiguration {
             "/admin/v1/settings/**",
             "/admin/v1/api-tokens/**",
             "/admin/v1/webhooks/**",
+            "/admin/v1/growthbook/**",
+            "/admin/v1/shadow/run",
     };
 
     /** Admin-only even for reading: who holds which credential is not for every viewer. */
@@ -61,6 +63,7 @@ public class SecurityConfiguration {
             "/admin/v1/api-tokens/**",
             "/admin/v1/webhooks/**",
             "/admin/v1/sdk-connections/*/decryption-key",
+            "/admin/v1/growthbook/**",
     };
 
     @Bean

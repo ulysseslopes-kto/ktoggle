@@ -1,0 +1,11 @@
+{
+ "environments": [
+  {
+   "id": "production",
+   "projects": [],
+   "description": "",
+   "defaultState": true,
+   "toggleOnList": true
+  }
+ ]
+}

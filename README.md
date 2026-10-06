@@ -102,6 +102,14 @@ Any official GrowthBook SDK can point at the local ktoggle: set `apiHost=http://
 `clientKey` of an SDK connection. ktoggle is a standalone product and is not integrated with any other KTO service
 yet.
 
+## Migrating from GrowthBook
+
+ktoggle includes an importer (dry run, idempotent, keeps client keys, rollout seeds and experiment hashing) and a shadow
+mode that compares, with the official SDK, what GrowthBook and ktoggle would serve to the same simulated users, until
+each client key is ready to migrate. Both are read-only towards GrowthBook and can be tried locally against a
+disposable open source GrowthBook (`docker compose --profile growthbook`). See [docs/MIGRATION.md](docs/MIGRATION.md)
+for the local demo and the cutover runbook.
+
 ## Main endpoints
 
 | Area | Endpoints |
@@ -112,13 +120,15 @@ yet.
 | Catalog | `/admin/v1/{projects,environments,attributes,saved-groups,sdk-connections}` |
 | Bundles | `/admin/v1/bundles/{hash}`, `/admin/v1/sdk-connections/{ck}/{bundles,activations,activations/at,activations/verify,deliveries}`, rollback `POST .../bundles/{hash}/activate`, `POST .../unpin` |
 | Audit | `/admin/v1/audit`, `/admin/v1/audit/verify`, `/admin/v1/decisions`, `/admin/v1/decisions/{id}/verify-attributes` |
-| Evaluation | `POST /admin/v1/simulate`, `POST /admin/v1/replay`, `POST /admin/v1/replay/at` |
+| Evaluation | `POST /admin/v1/simulate`, `POST /admin/v1/replay`, `POST /admin/v1/replay/at`, `POST /api/eval/{clientKey}` (remote evaluation) |
+| Migration | `GET /admin/v1/growthbook/status`, `POST /admin/v1/growthbook/import`, `GET /admin/v1/shadow`, `POST /admin/v1/shadow/run`, `GET /admin/v1/shadow/{clientKey}/runs` |
 
 ## Roadmap
 
 - **Done:** flags and targeting, A/B experiment rules, scheduled rules, prerequisites, saved groups (all / any / none), API tokens, webhooks (Slack or signed JSON), per-project permissions, encrypted payloads, remote evaluation, drafts with configurable review and approval, auditable bundles, replay, delivery and
   decision logs, admin UI (`ktoggle-ui`), one-command demo.
-- **Next:** decided after the evaluation (for example the GrowthBook importer and shadow comparison, needed before any migration).
+- **Ready for the migration:** GrowthBook importer, shadow comparison with readiness per client key, cutover runbook.
+- **Next:** decided after the evaluation.
 - **After the evaluation:** how ktoggle is rolled out inside the company.
 
 See the [development guide](docs/DEVELOPMENT.md) for conventions and code invariants.

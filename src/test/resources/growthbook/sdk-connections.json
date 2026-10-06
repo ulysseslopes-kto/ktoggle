@@ -1,0 +1,43 @@
+{
+ "connections": [
+  {
+   "id": "sdk_3xnappjdmuvyjw0b",
+   "name": "GB demo (production)",
+   "organization": "org_3xnappjdmuvyi0nj",
+   "dateCreated": "2026-10-06T00:46:06.539Z",
+   "dateUpdated": "2026-10-06T00:46:06.539Z",
+   "languages": [
+    "javascript"
+   ],
+   "sdkVersion": "1.8.0",
+   "environment": "production",
+   "project": "",
+   "projects": [],
+   "encryptPayload": false,
+   "encryptionKey": "AAECAwQFBgcICQoLDA0ODw==",
+   "hashSecureAttributes": false,
+   "includeVisualExperiments": false,
+   "includeDraftExperiments": false,
+   "includeDraftExperimentRefs": false,
+   "includeExperimentNames": false,
+   "includeRedirectExperiments": false,
+   "includeRuleIds": false,
+   "includeProjectIdInMetadata": false,
+   "includeCustomFieldsInMetadata": false,
+   "allowedCustomFieldsInMetadata": [],
+   "includeTagsInMetadata": false,
+   "key": "sdk-46eVWBICRMOJ8mHs",
+   "proxyEnabled": false,
+   "proxyHost": "",
+   "proxySigningKey": "y0YWuH0ioNkEJSN40iStztJvCYmWdIre8cTcoezdrQ0",
+   "savedGroupFormat": "inline",
+   "includeReferencedPrerequisites": true
+  }
+ ],
+ "limit": 10,
+ "offset": 0,
+ "count": 1,
+ "total": 1,
+ "hasMore": false,
+ "nextOffset": null
+}

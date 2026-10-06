@@ -59,6 +59,11 @@ services:
         condition: service_started
       keycloak:
         condition: service_healthy
+    # Present only after local-infra/growthbook/seed.mjs ran against the local GrowthBook (profile growthbook):
+    # points the importer and the shadow comparison at it. Without it ktoggle never calls any GrowthBook.
+    env_file:
+      - path: local-infra/growthbook/local.env
+        required: false
     environment:
       SPRING_PROFILES_ACTIVE: local,demo
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ktoggle
@@ -84,5 +89,32 @@ services:
     ports:
       - "5173:5173"
 
+  # Local, disposable GrowthBook (open source) used only to demonstrate the importer and the shadow comparison.
+  # It is not KTO's GrowthBook and holds no KTO data.   docker compose --profile growthbook up -d
+  growthbook-mongo:
+    profiles: [growthbook]
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: growthbook
+      MONGO_INITDB_ROOT_PASSWORD: growthbook-local
+    volumes:
+      - growthbook-mongo:/data/db
+
+  growthbook:
+    profiles: [growthbook]
+    # pinned: the importer and the shadow comparison are verified against this exact version
+    image: growthbook/growthbook@sha256:d17f0e4d42457a7b42d7f1998dc4576ef78dc978fac9bef7b4870fd755973106
+    depends_on: [growthbook-mongo]
+    environment:
+      MONGODB_URI: mongodb://growthbook:growthbook-local@growthbook-mongo:27017/growthbook?authSource=admin
+      APP_ORIGIN: http://localhost:3300
+      API_HOST: http://localhost:3400
+      JWT_SECRET: local-only-growthbook-jwt-secret-not-for-production
+      ENCRYPTION_KEY: local-only-growthbook-encryption-key
+    ports:
+      - "3300:3000"
+      - "3400:3100"
+
 volumes:
   ktoggle-postgres:
+  growthbook-mongo:

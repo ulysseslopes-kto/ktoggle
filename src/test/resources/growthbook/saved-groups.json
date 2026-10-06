@@ -1,0 +1,41 @@
+{
+ "savedGroups": [
+  {
+   "id": "grp_2Cfk4QcqYhUvnCBKwRNaLJ",
+   "type": "condition",
+   "values": [],
+   "condition": "{\"vipLevel\":{\"$gte\":3}}",
+   "name": "GB VIPs",
+   "attributeKey": "",
+   "dateCreated": "2026-10-06T00:45:39.165Z",
+   "dateUpdated": "2026-10-06T00:45:39.165Z",
+   "owner": "",
+   "projects": [],
+   "archived": false,
+   "useEmptyListGroup": true
+  },
+  {
+   "id": "grp_2Cfk4QcuGg9UXZyXLjexhJ",
+   "type": "list",
+   "values": [
+    "tester-1",
+    "tester-2"
+   ],
+   "condition": "",
+   "name": "GB testers",
+   "attributeKey": "id",
+   "dateCreated": "2026-10-06T00:45:39.181Z",
+   "dateUpdated": "2026-10-06T00:45:39.181Z",
+   "owner": "",
+   "projects": [],
+   "archived": false,
+   "useEmptyListGroup": true
+  }
+ ],
+ "limit": 10,
+ "offset": 0,
+ "count": 2,
+ "total": 2,
+ "hasMore": false,
+ "nextOffset": null
+}

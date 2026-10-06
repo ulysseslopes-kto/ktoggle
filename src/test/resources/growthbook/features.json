@@ -1,0 +1,358 @@
+{
+ "features": [
+  {
+   "id": "gb-new-checkout",
+   "description": "New checkout (GB)",
+   "archived": false,
+   "dateCreated": "2026-10-06T00:45:39.197Z",
+   "dateUpdated": "2026-10-06T00:58:19.186Z",
+   "defaultValue": "false",
+   "environments": {
+    "production": {
+     "enabled": true,
+     "defaultValue": "false",
+     "rules": [
+      {
+       "id": "fr_3xnappjdmuvyjawu",
+       "type": "force",
+       "description": "",
+       "value": "true",
+       "condition": "",
+       "savedGroups": [
+        {
+         "match": "any",
+         "ids": [
+          "grp_2Cfk4QcuGg9UXZyXLjexhJ"
+         ]
+        }
+       ],
+       "enabled": true,
+       "savedGroupTargeting": [
+        {
+         "matchType": "any",
+         "savedGroups": [
+          "grp_2Cfk4QcuGg9UXZyXLjexhJ"
+         ]
+        }
+       ],
+       "prerequisites": []
+      },
+      {
+       "id": "fr_3xnappjdmuvyjawv",
+       "type": "rollout",
+       "coverage": 0.3,
+       "description": "",
+       "hashAttribute": "id",
+       "value": "true",
+       "condition": "{\"country\":\"BR\"}",
+       "savedGroups": [],
+       "enabled": true,
+       "seed": "fr_3xnappjdmuvyjawv",
+       "savedGroupTargeting": [],
+       "prerequisites": []
+      }
+     ],
+     "definition": "{\"defaultValue\":false,\"rules\":[{\"condition\":{\"id\":{\"$inGroup\":\"grp_2Cfk4QcuGg9UXZyXLjexhJ\"}},\"force\":true},{\"condition\":{\"country\":\"BR\"},\"force\":true,\"coverage\":0.3,\"hashAttribute\":\"id\",\"seed\":\"fr_3xnappjdmuvyjawv\"}]}"
+    }
+   },
+   "prerequisites": [],
+   "owner": "payments",
+   "project": "",
+   "targetingAllProjects": false,
+   "targetingProjects": [],
+   "tags": [
+    "checkout"
+   ],
+   "valueType": "boolean",
+   "revision": {
+    "id": "frev_3xnappjdmuvyzlbg",
+    "comment": "Created via REST API",
+    "date": "2026-10-06T00:58:19.178Z",
+    "createdBy": "API",
+    "publishedBy": "API",
+    "version": 2
+   },
+   "customFields": {}
+  },
+  {
+   "id": "gb-lobby-layout",
+   "description": "Lobby layout (GB)",
+   "archived": false,
+   "dateCreated": "2026-10-06T00:45:39.243Z",
+   "dateUpdated": "2026-10-06T00:47:06.388Z",
+   "defaultValue": "grid",
+   "environments": {
+    "production": {
+     "enabled": true,
+     "defaultValue": "grid",
+     "rules": [
+      {
+       "id": "fr_3xnappjdmuvyl669",
+       "type": "force",
+       "description": "",
+       "value": "carousel",
+       "condition": "{\"country\":{\"$in\":[\"BR\",\"PT\"]}}",
+       "savedGroups": [
+        {
+         "match": "all",
+         "ids": [
+          "grp_2Cfk4QcqYhUvnCBKwRNaLJ"
+         ]
+        }
+       ],
+       "enabled": true,
+       "savedGroupTargeting": [
+        {
+         "matchType": "all",
+         "savedGroups": [
+          "grp_2Cfk4QcqYhUvnCBKwRNaLJ"
+         ]
+        }
+       ],
+       "prerequisites": []
+      }
+     ],
+     "definition": "{\"defaultValue\":\"grid\",\"rules\":[{\"condition\":{\"$and\":[{\"country\":{\"$in\":[\"BR\",\"PT\"]}},{\"vipLevel\":{\"$gte\":3}}]},\"force\":\"carousel\"}]}"
+    }
+   },
+   "prerequisites": [],
+   "owner": "casino",
+   "project": "",
+   "targetingAllProjects": false,
+   "targetingProjects": [],
+   "tags": [],
+   "valueType": "string",
+   "revision": {
+    "id": "frev_3xnappjdmuvyl66j",
+    "comment": "Created via REST API",
+    "date": "2026-10-06T00:47:06.375Z",
+    "createdBy": "API",
+    "publishedBy": "API",
+    "version": 2
+   },
+   "customFields": {}
+  },
+  {
+   "id": "gb-max-bet",
+   "description": "Max bet (GB)",
+   "archived": false,
+   "dateCreated": "2026-10-06T00:45:39.272Z",
+   "dateUpdated": "2026-10-06T00:45:39.272Z",
+   "defaultValue": "1000",
+   "environments": {
+    "production": {
+     "enabled": true,
+     "defaultValue": "1000",
+     "rules": [
+      {
+       "id": "fr_3xnappjdmuvyjayw",
+       "type": "force",
+       "description": "",
+       "value": "50000",
+       "condition": "",
+       "savedGroups": [
+        {
+         "match": "all",
+         "ids": [
+          "grp_2Cfk4QcqYhUvnCBKwRNaLJ"
+         ]
+        }
+       ],
+       "enabled": true,
+       "savedGroupTargeting": [
+        {
+         "matchType": "all",
+         "savedGroups": [
+          "grp_2Cfk4QcqYhUvnCBKwRNaLJ"
+         ]
+        }
+       ],
+       "prerequisites": []
+      },
+      {
+       "id": "fr_3xnappjdmuvyjayx",
+       "type": "force",
+       "description": "",
+       "value": "0",
+       "condition": "{\"country\":\"XX\"}",
+       "savedGroups": [
+        {
+         "match": "none",
+         "ids": [
+          "grp_2Cfk4QcqYhUvnCBKwRNaLJ"
+         ]
+        }
+       ],
+       "enabled": true,
+       "savedGroupTargeting": [
+        {
+         "matchType": "none",
+         "savedGroups": [
+          "grp_2Cfk4QcqYhUvnCBKwRNaLJ"
+         ]
+        }
+       ],
+       "prerequisites": []
+      }
+     ],
+     "definition": "{\"defaultValue\":1000,\"rules\":[{\"condition\":{\"vipLevel\":{\"$gte\":3}},\"force\":50000},{\"condition\":{\"$and\":[{\"country\":\"XX\"},{\"$not\":{\"vipLevel\":{\"$gte\":3}}}]},\"force\":0}]}"
+    }
+   },
+   "prerequisites": [],
+   "owner": "sportsbook",
+   "project": "",
+   "targetingAllProjects": false,
+   "targetingProjects": [],
+   "tags": [],
+   "valueType": "number",
+   "revision": {
+    "id": "frev_3xnappjdmuvyjaz0",
+    "comment": "",
+    "date": "2026-10-06T00:45:39.275Z",
+    "createdBy": "API",
+    "publishedBy": "API",
+    "version": 1
+   },
+   "customFields": {}
+  },
+  {
+   "id": "gb-welcome-bonus",
+   "description": "Welcome bonus (GB)",
+   "archived": false,
+   "dateCreated": "2026-10-06T00:45:39.299Z",
+   "dateUpdated": "2026-10-06T00:45:39.299Z",
+   "defaultValue": "{\"enabled\":false}",
+   "environments": {
+    "production": {
+     "enabled": true,
+     "defaultValue": "{\"enabled\":false}",
+     "rules": [
+      {
+       "id": "fr_3xnappjdmuvyjazn",
+       "type": "force",
+       "description": "",
+       "value": "{\"enabled\":true,\"percent\":100}",
+       "condition": "{\"country\":\"BR\"}",
+       "savedGroups": [],
+       "enabled": true,
+       "savedGroupTargeting": [],
+       "prerequisites": []
+      }
+     ],
+     "definition": "{\"defaultValue\":{\"enabled\":false},\"rules\":[{\"condition\":{\"country\":\"BR\"},\"force\":{\"enabled\":true,\"percent\":100}}]}"
+    }
+   },
+   "prerequisites": [],
+   "owner": "payments",
+   "project": "",
+   "targetingAllProjects": false,
+   "targetingProjects": [],
+   "tags": [],
+   "valueType": "json",
+   "revision": {
+    "id": "frev_3xnappjdmuvyjazr",
+    "comment": "",
+    "date": "2026-10-06T00:45:39.303Z",
+    "createdBy": "API",
+    "publishedBy": "API",
+    "version": 1
+   },
+   "customFields": {}
+  },
+  {
+   "id": "gb-button-copy",
+   "description": "Button copy test (GB)",
+   "archived": false,
+   "dateCreated": "2026-10-06T00:46:06.488Z",
+   "dateUpdated": "2026-10-06T00:47:06.454Z",
+   "defaultValue": "Deposit",
+   "environments": {
+    "production": {
+     "enabled": true,
+     "defaultValue": "Deposit",
+     "rules": [
+      {
+       "id": "fr_3xnappjdmuvyl68c",
+       "type": "experiment",
+       "hashAttribute": "id",
+       "coverage": 1,
+       "trackingKey": "gb-button-copy",
+       "enabled": true,
+       "description": "",
+       "condition": "",
+       "savedGroups": [],
+       "values": [
+        {
+         "value": "Deposit",
+         "weight": 0.5,
+         "name": "Control"
+        },
+        {
+         "value": "Add funds",
+         "weight": 0.5,
+         "name": "Add funds"
+        }
+       ],
+       "savedGroupTargeting": [],
+       "prerequisites": []
+      }
+     ],
+     "definition": "{\"defaultValue\":\"Deposit\",\"rules\":[{\"variations\":[\"Deposit\",\"Add funds\"],\"coverage\":1,\"weights\":[0.5,0.5],\"meta\":[{\"key\":\"0\",\"name\":\"Control\"},{\"key\":\"1\",\"name\":\"Add funds\"}],\"key\":\"gb-button-copy\",\"hashAttribute\":\"id\"}]}"
+    }
+   },
+   "prerequisites": [],
+   "owner": "payments",
+   "project": "",
+   "targetingAllProjects": false,
+   "targetingProjects": [],
+   "tags": [],
+   "valueType": "string",
+   "revision": {
+    "id": "frev_3xnappjdmuvyl68h",
+    "comment": "Created via REST API",
+    "date": "2026-10-06T00:47:06.447Z",
+    "createdBy": "API",
+    "publishedBy": "API",
+    "version": 2
+   },
+   "customFields": {}
+  },
+  {
+   "id": "gb-dark-mode",
+   "description": "Disabled in production (GB)",
+   "archived": false,
+   "dateCreated": "2026-10-06T00:46:06.513Z",
+   "dateUpdated": "2026-10-06T00:46:06.513Z",
+   "defaultValue": "false",
+   "environments": {
+    "production": {
+     "enabled": false,
+     "defaultValue": "false",
+     "rules": []
+    }
+   },
+   "prerequisites": [],
+   "owner": "app",
+   "project": "",
+   "targetingAllProjects": false,
+   "targetingProjects": [],
+   "tags": [],
+   "valueType": "boolean",
+   "revision": {
+    "id": "frev_3xnappjdmuvyjvzp",
+    "comment": "",
+    "date": "2026-10-06T00:46:06.517Z",
+    "createdBy": "API",
+    "publishedBy": "API",
+    "version": 1
+   },
+   "customFields": {}
+  }
+ ],
+ "limit": 100,
+ "offset": 0,
+ "count": 6,
+ "total": 6,
+ "hasMore": false,
+ "nextOffset": null
+}
