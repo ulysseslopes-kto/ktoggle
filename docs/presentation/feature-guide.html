@@ -1,0 +1,883 @@
+<title>ktoggle Feature Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@1,800;1,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a sticky chapter index beside one reading column, on the ktoggle console's black; each feature is a block with the same four parts. */
+:root {
+  color-scheme: dark;
+  --ink: #000000;
+  --surface: #141414;
+  --surface-2: #1e1e1e;
+  --line: #2b2b2b;
+  --fg: #ffffff;
+  --soft: #d9d9d9;
+  --muted: #9b9b9b;
+  --red: #da0000;
+  --red-soft: #ff6b6b;
+  --green: #00dd70;
+  --yellow: #fad749;
+  --display: 'Archivo', 'Inter', system-ui, sans-serif;
+  --body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { background: var(--ink); color: var(--fg); font: 400 1rem/1.65 var(--body); -webkit-font-smoothing: antialiased; }
+::selection { background: var(--red); color: #fff; }
+a { color: var(--fg); text-decoration-color: var(--red); text-underline-offset: 3px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+code { font: 400 .85em/1 var(--mono); background: var(--surface-2); padding: .12em .35em; border-radius: 3px; color: var(--fg); overflow-wrap: anywhere; }
+
+.shell { max-width: 76rem; margin: 0 auto; padding-inline: 1.25rem; padding-block: 2rem 5rem; display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 3rem; }
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 1.5rem); align-self: start; max-height: calc(100vh - 3rem); overflow-y: auto; padding-right: .5rem; }
+.brand { display: flex; align-items: center; gap: .55rem; margin-bottom: 2rem; }
+.pill { width: 2rem; height: 1.15rem; border-radius: 999px; background: var(--red); padding: .15rem; display: flex; justify-content: flex-end; }
+.pill span { width: .85rem; height: .85rem; border-radius: 50%; background: #fff; }
+.wordmark { font: italic 900 1.7rem/1 var(--display); text-transform: uppercase; }
+.wordmark b { color: var(--red); font-weight: 900; }
+.toc ol { list-style: none; margin: 0; padding: 0; }
+.toc > nav > ol > li { margin-bottom: 1.1rem; }
+.toc .chapter { display: block; font: 600 .7rem/1.3 var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); text-decoration: none; margin-bottom: .4rem; }
+.toc .chapter span { color: var(--red); font-family: var(--mono); margin-right: .35rem; }
+.toc ol ol a { display: block; font-size: .84rem; color: var(--soft); text-decoration: none; padding: .18rem 0 .18rem .7rem; border-left: 1px solid var(--line); }
+.toc ol ol a:hover { color: var(--fg); border-left-color: var(--red); }
+.toc details summary { display: none; }
+
+main { min-width: 0; }
+.hero { padding-bottom: 2.5rem; border-bottom: 1px solid var(--line); }
+.eyebrow { font: 600 .72rem/1 var(--body); text-transform: uppercase; letter-spacing: .16em; color: var(--red); }
+h1 { font: italic 900 clamp(2.1rem, 5vw, 3.3rem)/1 var(--display); text-transform: uppercase; margin: .8rem 0 1.1rem; text-wrap: balance; }
+.lede { font-size: 1.1rem; color: var(--soft); max-width: 46rem; margin: 0 0 1.6rem; }
+.how { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.how div { background: var(--surface); padding: .9rem 1rem; min-width: 0; }
+.how b { display: block; font: 600 .68rem/1.2 var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--red); margin-bottom: .35rem; }
+.how span { font-size: .86rem; color: var(--soft); }
+.numbers { display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; margin-top: 1.6rem; font-size: .86rem; color: var(--muted); }
+.numbers strong { color: var(--yellow); font-variant-numeric: tabular-nums; font-weight: 600; margin-right: .25rem; }
+
+.chapter-head { padding-top: 3.5rem; margin-bottom: 1.2rem; }
+.chapter-head .num { font: 600 .8rem/1 var(--mono); color: var(--red); }
+h2 { font: italic 800 clamp(1.5rem, 3.2vw, 2rem)/1.1 var(--display); text-transform: uppercase; margin: .45rem 0 .6rem; text-wrap: balance; }
+.chapter-head p { color: var(--soft); max-width: 46rem; margin: 0; }
+
+.feature { border: 1px solid var(--line); background: var(--surface); margin-top: 1rem; }
+.feature header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .4rem 1rem; padding: 1rem 1.2rem .2rem; }
+h3 { font: 700 1.08rem/1.3 var(--body); margin: 0; }
+.tier { font: 600 .66rem/1 var(--body); text-transform: uppercase; letter-spacing: .1em; padding: .3rem .45rem; border-radius: 3px; white-space: nowrap; }
+.tier.ent { border: 1px solid #5a0000; color: var(--red-soft); }
+.tier.all { border: 1px solid var(--line); color: var(--muted); }
+.tier.only { border: 1px solid #0b5a35; color: var(--green); }
+.summary { padding: .2rem 1.2rem 0; margin: .3rem 0 0; color: var(--soft); max-width: 50rem; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 1.4rem; padding: .9rem 1.2rem 1.2rem; }
+.cols h4 { font: 600 .68rem/1 var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 .55rem; }
+.cols ul { margin: 0; padding-left: 1.05rem; color: var(--soft); font-size: .92rem; }
+.cols li { margin-bottom: .38rem; }
+.cols li::marker { color: var(--red); }
+.cols li strong { color: var(--fg); }
+.note { margin: 0; color: var(--muted); font-size: .88rem; }
+.where { font-size: .8rem; color: var(--muted); padding: .6rem 1.2rem; border-top: 1px solid var(--line); }
+.where b { color: var(--soft); font-weight: 500; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); margin: .3rem 0 .4rem; }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+th, td { text-align: left; padding: .55rem .75rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 .66rem/1.2 var(--body); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); background: var(--surface-2); }
+td { color: var(--soft); }
+tr:last-child td { border-bottom: 0; }
+.y { color: var(--yellow); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: .3rem 0 .2rem; font-size: .8rem; }
+.flow span { border: 1px solid var(--line); background: var(--surface-2); padding: .3rem .55rem; color: var(--soft); }
+.flow i { color: var(--red); font-style: normal; }
+
+footer { margin-top: 4rem; padding-top: 1.4rem; border-top: 1px solid var(--line); font-size: .8rem; color: var(--muted); }
+
+@media (max-width: 64rem) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .toc { position: static; max-height: none; overflow: visible; padding: 0; }
+  .toc details { border: 1px solid var(--line); background: var(--surface); padding: .7rem 1rem; }
+  .toc details summary { display: block; cursor: pointer; font: 600 .75rem/1.2 var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--soft); }
+  .toc details[open] summary { margin-bottom: 1rem; }
+  .brand { margin-bottom: 1rem; }
+}
+@media (max-width: 44rem) {
+  .cols { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<div class="shell">
+  <aside class="toc">
+    <div class="brand" aria-label="ktoggle"><span class="pill" aria-hidden="true"><span></span></span><span class="wordmark">kto<b>ggle</b></span></div>
+    <details open>
+      <summary>Contents</summary>
+      <nav aria-label="Contents">
+        <ol>
+          <li><a class="chapter" href="#flags"><span>01</span>Flags and targeting</a>
+            <ol>
+              <li><a href="#features">Features</a></li>
+              <li><a href="#environments">Environments</a></li>
+              <li><a href="#projects">Projects</a></li>
+              <li><a href="#attributes">Attributes</a></li>
+              <li><a href="#conditions">Targeting conditions</a></li>
+              <li><a href="#saved-groups">Saved groups</a></li>
+              <li><a href="#force">Force rules</a></li>
+              <li><a href="#rollouts">Percentage rollouts</a></li>
+              <li><a href="#experiments">A/B experiments</a></li>
+              <li><a href="#schedules">Scheduled rules</a></li>
+              <li><a href="#prerequisites">Prerequisites</a></li>
+              <li><a href="#test-feature">Test feature</a></li>
+            </ol>
+          </li>
+          <li><a class="chapter" href="#governance"><span>02</span>Changing flags safely</a>
+            <ol>
+              <li><a href="#drafts">Drafts and diff</a></li>
+              <li><a href="#reviews">Review and approval</a></li>
+              <li><a href="#emergency">Emergency publication</a></li>
+              <li><a href="#revisions">Revisions and revert</a></li>
+              <li><a href="#roles">Sign-in and roles</a></li>
+              <li><a href="#project-permissions">Per-project permissions</a></li>
+              <li><a href="#api-tokens">API tokens</a></li>
+              <li><a href="#webhooks">Webhooks and notifications</a></li>
+            </ol>
+          </li>
+          <li><a class="chapter" href="#delivery"><span>03</span>Delivering flags</a>
+            <ol>
+              <li><a href="#sdk-connections">SDK connections</a></li>
+              <li><a href="#streaming">Streaming and polling</a></li>
+              <li><a href="#resilience">Many pods, failures</a></li>
+              <li><a href="#encryption">Encrypted payloads</a></li>
+              <li><a href="#remote-eval">Remote evaluation</a></li>
+              <li><a href="#playground">SDK playground</a></li>
+            </ol>
+          </li>
+          <li><a class="chapter" href="#audit"><span>04</span>Proving every decision</a>
+            <ol>
+              <li><a href="#bundles">Signed bundles</a></li>
+              <li><a href="#chain">Activation chain</a></li>
+              <li><a href="#rollback">Rollback</a></li>
+              <li><a href="#replay">Replay</a></li>
+              <li><a href="#delivery-log">Delivery log</a></li>
+              <li><a href="#decision-log">Decision log</a></li>
+              <li><a href="#audit-log">Audit log</a></li>
+            </ol>
+          </li>
+          <li><a class="chapter" href="#migration"><span>05</span>Migrating from GrowthBook</a>
+            <ol>
+              <li><a href="#importer">Importer</a></li>
+              <li><a href="#shadow">Shadow mode</a></li>
+              <li><a href="#cutover">Cutover runbook</a></li>
+            </ol>
+          </li>
+          <li><a class="chapter" href="#platform"><span>06</span>Under the hood</a>
+            <ol>
+              <li><a href="#architecture">Architecture</a></li>
+              <li><a href="#quality">Quality and tests</a></li>
+              <li><a href="#operations">Operations</a></li>
+            </ol>
+          </li>
+        </ol>
+      </nav>
+    </details>
+  </aside>
+
+  <main>
+    <div class="hero">
+      <div class="eyebrow">Feature guide · October 2026</div>
+      <h1>Everything ktoggle does, explained</h1>
+      <p class="lede">ktoggle is KTO's feature flag and experimentation service, compatible with the GrowthBook SDKs our apps already use. This guide walks through every feature: what it does, how it works, and what to know about it. No code needed to follow it.</p>
+      <div class="how" role="list">
+        <div role="listitem"><b>What it does</b><span>One sentence on the feature and why it matters.</span></div>
+        <div role="listitem"><b>How it works</b><span>The behaviour, step by step.</span></div>
+        <div role="listitem"><b>Good to know</b><span>Limits, safeguards and details that matter in practice.</span></div>
+        <div role="listitem"><b>GrowthBook</b><span>Plan in which GrowthBook offers it, or whether it exists at all.</span></div>
+      </div>
+      <div class="numbers">
+        <span><strong>39</strong>features described</span>
+        <span><strong>316</strong>unit tests</span>
+        <span><strong>55</strong>integration tests</span>
+        <span><strong>19</strong>end-to-end browser tests</span>
+        <span><strong>0</strong>code changes needed in apps</span>
+      </div>
+    </div>
+
+    <!-- ============================================================ 01 -->
+    <section id="flags">
+      <div class="chapter-head">
+        <span class="num">01</span>
+        <h2>Flags and targeting</h2>
+        <p>The building blocks: what a flag is, where it applies and who gets which value.</p>
+      </div>
+
+      <article class="feature" id="features">
+        <header><h3>Features (flags)</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">A feature is a named switch or setting that applications read at runtime, so behaviour can change without a deploy.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each feature has a <strong>key</strong> (for example <code>new-checkout</code>), a <strong>type</strong> (on/off, text, number or JSON) and a <strong>default value</strong>.</li>
+            <li>Rules on top of the default decide who gets something else. They are evaluated top to bottom; the first one that applies wins.</li>
+            <li>Description, owner and tags help find and own features. The list shows the most recently changed first.</li>
+            <li>Features are never deleted, only archived, because past bundles and audits refer to them.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>The value type is fixed at creation and validated on every change: a number flag can never be served text.</li>
+            <li>JSON flags carry structured configuration, such as a bonus with percent, cap and rollover.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Features.</div>
+      </article>
+
+      <article class="feature" id="environments">
+        <header><h3>Environments</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">The same feature can be on in staging and off in production, with different rules in each.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each feature has, per environment, an <strong>on/off switch</strong> and its own list of rules.</li>
+            <li>When a feature is off in an environment, apps there do not receive it at all and evaluate it as off.</li>
+            <li>An environment can be marked <strong>requires review</strong>: changes that reach it need an approval (see Review and approval).</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>In the demo, Production requires review and Staging does not.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Configuration → Environments; feature page tabs.</div>
+      </article>
+
+      <article class="feature" id="projects">
+        <header><h3>Projects</h3><span class="tier all">GrowthBook: 1 (free), 3 (Pro), more on Enterprise</span></header>
+        <p class="summary">Group features by product area (payments, casino, sportsbook) and limit what each app receives.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>A feature belongs to at most one project.</li>
+            <li>An SDK connection can be limited to some projects, so an app downloads only the flags it needs.</li>
+            <li>Projects can also limit who edits their features (see Per-project permissions).</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>No limit on the number of projects.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Configuration → Projects.</div>
+      </article>
+
+      <article class="feature" id="attributes">
+        <header><h3>Attributes</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">The catalog of user properties rules can target: country, app version, VIP level, user id and so on.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each attribute has a type (text, number, boolean, lists, or a fixed set of values).</li>
+            <li>Rules may only reference attributes from the catalog, so typos are caught before they ship.</li>
+            <li>One or more attributes are marked as <strong>hash attributes</strong> (usually the user id): they make rollouts and experiments sticky per user.</li>
+            <li>Attributes can be flagged as <strong>personal data</strong>; the decision log then never stores them in clear (LGPD).</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Apps send attributes to the SDK, which evaluates locally: user data does not leave the app (except with remote evaluation, by choice).</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Feature flags → Attributes.</div>
+      </article>
+
+      <article class="feature" id="conditions">
+        <header><h3>Targeting conditions</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">Describe who a rule applies to, from simple ("country is BR") to complex (app version at least 2.3 and VIP level 3 or more).</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>A visual builder (attribute, operator, value) covers everyday cases; a JSON mode accepts the full GrowthBook condition language.</li>
+            <li>Supported operators include equals, in list, greater than, regex, exists, version comparisons and and/or/not combinations.</li>
+            <li>Every condition is validated against the attribute catalog before it can be saved.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Rules read in plain words on the feature page, for example "IF country equals BR AND in group VIPs".</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="saved-groups">
+        <header><h3>Saved groups (all, any, none)</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">Reusable audiences, such as "beta testers" or "VIPs", that many rules can target and that change in one place.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>A group is either a <strong>list</strong> of values for one attribute (for example, user ids) or a <strong>condition</strong> (for example, VIP level 3 or more).</li>
+            <li>In a rule, each group is <strong>required</strong> (must be in), part of an <strong>any of</strong> set (at least one), or <strong>excluded</strong> (must not be in).</li>
+            <li>Changing a group updates every rule that uses it at the next publication.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>A group used by any rule cannot be deleted.</li>
+            <li>A rule cannot both require and exclude the same group.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Feature flags → Saved groups; rule editor.</div>
+      </article>
+
+      <article class="feature" id="force">
+        <header><h3>Force rules</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">Give a specific value to everyone who matches the rule.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Condition and/or saved groups decide who matches; matching users get the rule's value.</li>
+            <li>Typical uses: turn something on for testers, one country, or a VIP tier.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Any rule can also be scheduled and depend on other features (see below).</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="rollouts">
+        <header><h3>Percentage rollouts</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">Release to a share of users (5%, 25%, 100%) and grow it gradually, with the same users staying in as it grows.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each user's hash attribute (the user id) is turned into a stable number between 0 and 1.</li>
+            <li>Users whose number falls under the percentage get the value. Raising 25% to 50% keeps the first 25% and adds more.</li>
+            <li>The calculation is identical in every app, server and language, so a user sees the same thing everywhere.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Rollouts imported from GrowthBook keep GrowthBook's seed, so no user moves in or out of a rollout because of the migration.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="experiments">
+        <header><h3>A/B experiments</h3><span class="tier all">GrowthBook: all plans (statistics engine not in ktoggle)</span></header>
+        <p class="summary">Split users between two or more variations and send each exposure to analytics (Mixpanel) to measure which one wins.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>An experiment has a <strong>tracking key</strong>, variations with values and weights (for example 34/33/33), the share of users included and the hash attribute.</li>
+            <li>The SDK assigns each user a variation deterministically: the same user always gets the same variation, in any replica or app.</li>
+            <li>When a user sees an experiment, the SDK calls the app's tracking callback with the experiment and the variation; that is what goes to Mixpanel.</li>
+            <li>"Test feature" and "Replay" show which variation a user got and whether they were in the experiment.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Raising the share of users only adds people; changing weights reshuffles some of them, so treat it as a new phase.</li>
+            <li>Results analysis stays in Mixpanel or the warehouse: ktoggle has no statistics engine.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> rule editor → Experiment. Demo: <code>deposit-button-copy</code>.</div>
+      </article>
+
+      <article class="feature" id="schedules">
+        <header><h3>Scheduled rules</h3><span class="tier ent">GrowthBook: Enterprise</span></header>
+        <p class="summary">Turn a rule on and off at set times, for example a Black Friday bonus from Friday to Monday, without anyone at the keyboard.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Any rule can have a start, an end, or both (in the editor's time zone).</li>
+            <li>Outside its window the rule is simply not sent to apps. ktoggle publishes a new configuration within about 10 seconds of each start and end.</li>
+            <li>Each switch is recorded as done by <code>system:scheduler</code>, with the rule that changed.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>The rule list shows Scheduled, Live or Ended.</li>
+            <li>"Evaluate at" in Test feature previews what a user will get at a future date.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>Demo:</b> <code>welcome-bonus</code> → Production → "Black Friday boost".</div>
+      </article>
+
+      <article class="feature" id="prerequisites">
+        <header><h3>Prerequisites</h3><span class="tier ent">GrowthBook: Enterprise</span></header>
+        <p class="summary">Make a feature depend on another: "instant cashback" only for users who already have the new checkout.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li><strong>On a feature:</strong> unless every parent condition passes for the user, the feature is off for them, in every environment.</li>
+            <li><strong>On a rule:</strong> if the parent fails, only that rule is skipped and evaluation continues.</li>
+            <li>Conditions: parent is on, off, live, not live, equals a value, or a custom condition.</li>
+            <li>The parent's page lists the features that depend on it.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Cycles (a needs b, b needs a, through any chain) are rejected, and parents must be in the same project.</li>
+            <li>Changing prerequisites needs approval in protected environments, like the default value.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>Demo:</b> <code>instant-cashback</code> depends on <code>new-checkout</code>.</div>
+      </article>
+
+      <article class="feature" id="test-feature">
+        <header><h3>Test feature</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">Check what a given user gets before (and after) publishing, using the same SDK that runs in production.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Pick an environment, type the user's attributes and evaluate. The panel shows the value, which rule produced it and why each rule did or did not apply.</li>
+            <li>While a draft is open, it evaluates the draft, so you see the effect before publishing.</li>
+            <li>"Evaluate at" simulates a future date, for scheduled rules.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>It also explains experiments (variation, bucket) and prerequisite gates.</li>
+          </ul></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============================================================ 02 -->
+    <section id="governance">
+      <div class="chapter-head">
+        <span class="num">02</span>
+        <h2>Changing flags safely</h2>
+        <p>Who can change what, how changes are reviewed, and how every change is traced back to a person and a reason.</p>
+      </div>
+
+      <article class="feature" id="drafts">
+        <header><h3>Drafts and diff</h3><span class="tier ent">GrowthBook: Enterprise</span></header>
+        <p class="summary">Every change starts as a draft. Nothing reaches an app until the draft is published.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>The first edit on a feature opens a draft automatically. Several edits can be grouped in one draft.</li>
+            <li>"Review &amp; publish" shows a side-by-side diff: what is live now and what it will be after publishing.</li>
+            <li>If someone publishes another change meanwhile, the draft is merged section by section; real conflicts are shown and must be resolved explicitly.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Toggling a flag from the list also goes through a draft.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="reviews">
+        <header><h3>Review and approval (four eyes)</h3><span class="tier ent">GrowthBook: Enterprise</span></header>
+        <p class="summary">Changes to protected environments, such as production, need someone else's approval.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>The author requests a review with a comment; reviewers find it on the Reviews page (with a pending counter).</li>
+            <li>Reviewers approve or request changes. Changing an approved draft resets the approval (configurable).</li>
+            <li>Admins configure <strong>who can approve</strong> (Keycloak roles and/or users) and whether authors may approve their own drafts (off by default).</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Changes that affect every environment (default value, prerequisites, archiving) need approval if any protected environment is affected.</li>
+            <li>Automation (API tokens) can never approve: reviews are always made by people.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Reviews; Configuration → Settings.</div>
+      </article>
+
+      <article class="feature" id="emergency">
+        <header><h3>Emergency publication</h3><span class="tier ent">GrowthBook: Enterprise</span></header>
+        <p class="summary">In an incident, an admin can publish without waiting for approval, with a mandatory reason.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Allowed only to admins, and only if enabled in Settings.</li>
+            <li>The reason is mandatory and is stored in the audit trail. The event is marked "published WITHOUT APPROVAL".</li>
+            <li>A webhook can notify a channel every time it happens.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Speed for incidents without losing traceability.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="revisions">
+        <header><h3>Revisions and revert</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">Every publication creates a numbered revision; any past revision can be restored.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>The revision history shows who changed what, when and why.</li>
+            <li>"Revert" opens a draft with the old content, which goes through the same review as any change.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>History is never rewritten: a revert is a new revision.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="roles">
+        <header><h3>Sign-in and roles</h3><span class="tier ent">GrowthBook SSO/SCIM: Enterprise</span></header>
+        <p class="summary">Single sign-on through Keycloak (the company identity provider) with four roles.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li><strong>Viewer</strong> reads everything, tests and replays.</li>
+            <li><strong>Editor</strong> also creates and edits drafts.</li>
+            <li><strong>Approver</strong> reviews drafts when listed in the review settings.</li>
+            <li><strong>Admin</strong> also manages environments, connections, settings, tokens and webhooks.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>No per-seat cost: everyone who needs access can have it.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="project-permissions">
+        <header><h3>Per-project permissions</h3><span class="tier ent">GrowthBook custom roles: Enterprise</span></header>
+        <p class="summary">Limit who can change a project's features: only the payments squad edits payments flags.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each project can list the Keycloak roles and users (or API tokens) allowed to change its features. With no list, every editor can.</li>
+            <li>Blocks creating features, editing drafts, requesting review and publishing. Moving a feature between projects needs rights on both.</li>
+            <li>Outsiders see the feature read-only, with an explanation.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Reading, testing and reviewing stay open. Admins always have access.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="api-tokens">
+        <header><h3>API tokens</h3><span class="tier all">GrowthBook: available</span></header>
+        <p class="summary">Credentials for automation (CI pipelines, scripts) to read or edit flags without a person signing in.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Admins create a token with a role (viewer or editor) and an expiry (30 days, 90 days, a year or never).</li>
+            <li>The secret is shown once; ktoggle stores only its hash. Revoking cuts access immediately.</li>
+            <li>Everything done with a token is audited as <code>token:&lt;name&gt;</code>; last use is recorded.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Tokens can never be admins, approve drafts or manage other tokens.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Configuration → API tokens.</div>
+      </article>
+
+      <article class="feature" id="webhooks">
+        <header><h3>Webhooks and notifications</h3><span class="tier all">GrowthBook: available</span></header>
+        <p class="summary">Tell Slack, or any system, when reviews are requested, drafts approved, changes published, rollbacks made or schedules switch.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each webhook picks its events and a format: a ready-made Slack message or signed JSON.</li>
+            <li>Notifications are saved together with the change they announce, then delivered by any server, with retries (30 s up to 8 min).</li>
+            <li>Every request is signed (HMAC-SHA256), so receivers can verify it came from ktoggle.</li>
+            <li>The console shows recent deliveries, attempts and responses, and has a "Send test" button.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>If the change is saved, its notification exists; if not, nothing is sent.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Configuration → Webhooks.</div>
+      </article>
+    </section>
+
+    <!-- ============================================================ 03 -->
+    <section id="delivery">
+      <div class="chapter-head">
+        <span class="num">03</span>
+        <h2>Delivering flags to applications</h2>
+        <p>How a published change reaches apps and services, how fast, and what happens when something fails.</p>
+      </div>
+
+      <article class="feature" id="sdk-connections">
+        <header><h3>SDK connections and GrowthBook compatibility</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">Each app reads its flags with a client key, through the official GrowthBook SDKs, unchanged.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>A connection ties a client key to an environment and, optionally, some projects.</li>
+            <li>ktoggle serves the same endpoints and format as GrowthBook (<code>/api/features/{key}</code>, <code>/sub/{key}</code>), so migrating an app means changing the host only.</li>
+            <li>Every build checks compatibility against the official Java SDK, and the end-to-end tests against the JavaScript SDK.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>The connection page has ready-to-use snippets for Java, JavaScript and React.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="streaming">
+        <header><h3>Streaming and polling</h3><span class="tier all">GrowthBook: all plans</span></header>
+        <p class="summary">A published change reaches every server immediately; apps see it in about a second when streaming.</p>
+        <div class="cols">
+          <div><h4>How it works</h4>
+            <div class="flow"><span>Publish</span><i>→</i><span>Seal bundle</span><i>→</i><span>Notify all servers</span><i>→</i><span>Push to apps</span></div>
+            <div class="table-wrap"><table>
+              <thead><tr><th>SDK mode</th><th>Time to see a change</th></tr></thead>
+              <tbody>
+                <tr><td>Streaming (SSE)</td><td><span class="y">~1 s</span></td></tr>
+                <tr><td>Polling with cache</td><td>Up to the cache time (<span class="y">~30 s</span> in our Java services today, same as GrowthBook)</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+          <div><h4>Good to know</h4><ul>
+            <li>Polling is cheap: if nothing changed, the answer is "not modified", with no body.</li>
+            <li>Each environment is independent: a staging change never touches production payloads.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="resilience">
+        <header><h3>Many servers and failures</h3><span class="tier only">ktoggle</span></header>
+        <p class="summary">ktoggle runs on several servers at once and keeps flags working when parts fail.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Every server keeps the active configuration in memory; requests from apps never touch the database.</li>
+            <li>Redis tells all servers about a new publication; a reconciler republishes anything missed every minute.</li>
+            <li>Apps keep evaluating with the last configuration they received, so a ktoggle outage freezes flags instead of breaking apps.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>A tampered configuration is refused and the server keeps serving the last valid one.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="encryption">
+        <header><h3>Encrypted payloads</h3><span class="tier ent">GrowthBook: Enterprise</span></header>
+        <p class="summary">Hide rules and values from anyone inspecting browser or app traffic.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Per connection, the payload is sent encrypted (AES), in GrowthBook's exact format; the SDK decrypts it with the connection's key.</li>
+            <li>Admins reveal and rotate the key; turning it on, off or rotating takes effect on every server without a new configuration.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>The key ships inside apps: this stops casual inspection, not a determined attacker.</li>
+            <li>The audit copy stays in clear text, so replay and verification are unaffected.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="remote-eval">
+        <header><h3>Remote evaluation</h3><span class="tier all">GrowthBook: Pro</span></header>
+        <p class="summary">The app sends the user's attributes and gets only the values; no rule ever reaches the browser.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Per connection; the SDK switches to remote mode with one option.</li>
+            <li>ktoggle evaluates with the official SDK against the active, verified configuration; every answer carries its bundle hash.</li>
+            <li>Experiments still fire the tracking callback, without revealing weights or coverage.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Meant for browsers and apps; backend services usually keep local evaluation (faster, works offline).</li>
+            <li>Cannot be combined with encryption (it would be redundant), as in GrowthBook.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="playground">
+        <header><h3>SDK playground</h3><span class="tier only">ktoggle</span></header>
+        <p class="summary">A live SDK inside the console, to watch a change arrive and see what a user gets.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Connects the official JavaScript SDK to any connection, including encrypted and remote-evaluation ones.</li>
+            <li>Shows every feature's value for the given attributes, flashes what changes and logs experiment exposures.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>The quickest way to show a change going live during a demo.</li>
+          </ul></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============================================================ 04 -->
+    <section id="audit">
+      <div class="chapter-head">
+        <span class="num">04</span>
+        <h2>Proving every decision</h2>
+        <p>What GrowthBook does not have: evidence of exactly what each app received and what each user got, at any point in time.</p>
+      </div>
+
+      <article class="feature" id="bundles">
+        <header><h3>Signed, immutable bundles</h3><span class="tier only">ktoggle only</span></header>
+        <p class="summary">Every configuration served to apps is sealed: fingerprinted, signed and stored where it cannot be altered.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each publication produces a bundle per connection: the exact payload, which feature revisions it came from and which evaluator reads it.</li>
+            <li>The bundle gets a fingerprint (canonical JSON, SHA-256) and a digital signature (AWS KMS).</li>
+            <li>The database refuses any edit or deletion, and a copy goes to S3 with Object Lock (write once, read many).</li>
+            <li>Servers verify fingerprint and signature before serving a bundle.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Republishing identical content produces the same fingerprint: no noise in the history.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="chain">
+        <header><h3>Activation chain and integrity check</h3><span class="tier only">ktoggle only</span></header>
+        <p class="summary">The sequence of configurations each connection served is linked like a ledger: any tampering shows.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each activation (publish, rollback, schedule switch) records who, when, why and a link to the previous one.</li>
+            <li>"Verify" recomputes the chain and points to the exact entry that was altered, if any.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Shown on each SDK connection page, with the active bundle's verified signature.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="rollback">
+        <header><h3>Rollback</h3><span class="tier only">ktoggle only</span></header>
+        <p class="summary">Put a connection back on a previous configuration in one action, with a reason.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Pick any earlier bundle of the connection; it becomes active immediately on every server.</li>
+            <li>The connection is pinned: new publications wait until someone unpins it, so the incident fix is not overwritten.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Audited, and can notify a channel through webhooks.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="replay">
+        <header><h3>Replay</h3><span class="tier only">ktoggle only</span></header>
+        <p class="summary">Answer "what did this user get on 14 March at 10:42?" with evidence, not guesses.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Replay by bundle, or by connection and instant (ktoggle finds the bundle active at that moment).</li>
+            <li>The decision is recomputed with the official SDK on that exact bundle: value, rule, experiment variation and why.</li>
+            <li>The answer stays the same even if the configuration changed many times since.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Useful for player disputes, regulator questions and incident analysis.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Auditing → Replay.</div>
+      </article>
+
+      <article class="feature" id="delivery-log">
+        <header><h3>Delivery log</h3><span class="tier only">ktoggle only</span></header>
+        <p class="summary">Which app received which configuration, and when.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Per client key and hour: which bundle was delivered, how many times, through polling, streaming or remote evaluation.</li>
+            <li>Answers "did the Android app already have the fix at 14:03?".</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>No IP addresses are stored; only the SDK name from the user agent.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="decision-log">
+        <header><h3>Decision log (LGPD-safe)</h3><span class="tier only">ktoggle only</span></header>
+        <p class="summary">Optionally, apps report the decisions they made, so they can be audited later.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Each event records the bundle, feature, value and rule, plus the user's non-personal attributes.</li>
+            <li>Personal attributes are never stored in clear: only a keyed fingerprint (HMAC), which can later confirm "these attributes produced this decision".</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Opt-in per app; stored in monthly partitions with configurable retention.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="audit-log">
+        <header><h3>Audit log</h3><span class="tier ent">GrowthBook: Enterprise (exportable, not tamper-evident)</span></header>
+        <p class="summary">Every change to anything (flags, groups, environments, tokens, webhooks) with who, what, when and why.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Before and after of every change, the person or token, the reason and a change id linking it to revisions and bundles.</li>
+            <li>Entries are chained, so any edit made directly in the database breaks the chain and is detected.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Secrets (tokens, webhook and encryption keys) never appear; only fingerprints.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Auditing → Audit log.</div>
+      </article>
+    </section>
+
+    <!-- ============================================================ 05 -->
+    <section id="migration">
+      <div class="chapter-head">
+        <span class="num">05</span>
+        <h2>Migrating from GrowthBook</h2>
+        <p>Built and tested on our side, ready to use once the move is approved. Read-only towards GrowthBook.</p>
+      </div>
+
+      <article class="feature" id="importer">
+        <header><h3>Importer</h3><span class="tier only">ktoggle</span></header>
+        <p class="summary">Brings GrowthBook's configuration into ktoggle, keeping every user's values and variations.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Reads projects, environments, attributes, saved groups, features and SDK connections from GrowthBook's API.</li>
+            <li>Dry run first, with a report per item: create, update, unchanged, unsupported, failed.</li>
+            <li>Keeps client keys, rule ids, rollout seeds, experiment hashing and encryption keys.</li>
+            <li>Idempotent: running it again applies only what changed in GrowthBook.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>What has no equivalent (safe rollouts, namespaces, bandits, visual editor) is reported, never dropped silently.</li>
+            <li>Environments can be mapped, for example production → prd.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="shadow">
+        <header><h3>Shadow mode</h3><span class="tier only">ktoggle</span></header>
+        <p class="summary">Proves, connection by connection, that ktoggle serves exactly what GrowthBook serves, before anyone switches.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>For each client key, both payloads are evaluated with the official SDK for the same 2,000 simulated users, built from the values the rules compare with.</li>
+            <li>Any feature where a user would get a different value is reported, with examples (user, GrowthBook value, ktoggle value).</li>
+            <li>After 3 clean runs in a row, the connection is marked <strong>ready to migrate</strong>. Metrics allow alerting.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Validated against a real (local) GrowthBook: a 25%→30% rollout change was caught (11 of 2,000 users), and a re-import brought it back to a match.</li>
+            <li>Never uses real user data.</li>
+          </ul></div>
+        </div>
+        <div class="where"><b>In the console:</b> Migration → From GrowthBook.</div>
+      </article>
+
+      <article class="feature" id="cutover">
+        <header><h3>Cutover runbook</h3><span class="tier only">ktoggle</span></header>
+        <p class="summary">A step-by-step plan to move each service, with a rollback that is one configuration change.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>Needed after approval: a read-only GrowthBook key, network access, the environment mapping.</li>
+            <li>Import, run shadow mode until ready, freeze the service's flags in GrowthBook, switch the host in its deployment values.</li>
+            <li>Rollback: revert the host. GrowthBook still holds the configuration.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>One service at a time, least critical first; payments and bet placement last.</li>
+          </ul></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============================================================ 06 -->
+    <section id="platform">
+      <div class="chapter-head">
+        <span class="num">06</span>
+        <h2>Under the hood</h2>
+        <p>How it is built, how it is tested and how it is run.</p>
+      </div>
+
+      <article class="feature" id="architecture">
+        <header><h3>Architecture</h3><span class="tier only">ktoggle</span></header>
+        <p class="summary">A standard house stack any squad can maintain.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li><strong>Backend:</strong> Java 21, Spring Boot 3.5 (virtual threads), PostgreSQL, Redis, AWS KMS and S3.</li>
+            <li><strong>Console:</strong> React 19 and TypeScript, Tailwind, TanStack Query, Radix, Keycloak sign-in.</li>
+            <li>Feature-oriented packages with enforced layering: architecture tests fail the build on dependency cycles.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>No vendor lock-in: the SDKs are GrowthBook's open-source libraries.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="quality">
+        <header><h3>Quality and tests</h3><span class="tier only">ktoggle</span></header>
+        <p class="summary">Every feature is covered at several levels, including against the real SDKs.</p>
+        <div class="cols">
+          <div><h4>How it works</h4>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Level</th><th>Count</th><th>Covers</th></tr></thead>
+              <tbody>
+                <tr><td>Unit</td><td class="y">316</td><td>Rules, validation, merging, permissions, crypto, sampling</td></tr>
+                <tr><td>Integration</td><td class="y">55</td><td>Full API on a real PostgreSQL, security, audit chains</td></tr>
+                <tr><td>SDK contract</td><td class="y">16+</td><td>Payloads evaluated by the official Java SDK, including GrowthBook's own output</td></tr>
+                <tr><td>End to end</td><td class="y">19</td><td>The console in a real browser, sign-in, drafts, JS SDK live</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+          <div><h4>Good to know</h4><ul>
+            <li>Several real bugs were caught by these tests before anyone saw them: an editor token listing tokens, a review gap on prerequisites, a hash seed that would have moved users.</li>
+          </ul></div>
+        </div>
+      </article>
+
+      <article class="feature" id="operations">
+        <header><h3>Operations</h3><span class="tier only">ktoggle</span></header>
+        <p class="summary">Observable, cheap to run and easy to try.</p>
+        <div class="cols">
+          <div><h4>How it works</h4><ul>
+            <li>JSON logs and Prometheus metrics: publication time, streaming connections, bundle integrity failures, webhook deliveries, shadow divergences.</li>
+            <li>Health checks and graceful behaviour when Redis or the database are briefly unavailable.</li>
+            <li>The whole product runs locally with one command, with demo data, users per role and an optional local GrowthBook.</li>
+          </ul></div>
+          <div><h4>Good to know</h4><ul>
+            <li>Running cost is infrastructure only: no licence, no per-seat price.</li>
+          </ul></div>
+        </div>
+      </article>
+    </section>
+
+    <footer>
+      ktoggle feature guide, October 2026. GrowthBook plan information from growthbook.io/pricing, consulted on 5 October 2026. Demo data is sample data; no KTO systems were used.
+    </footer>
+  </main>
+</div>
