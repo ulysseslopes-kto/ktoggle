@@ -3,6 +3,7 @@ package com.ktogroup.ktoggle.savedgroup;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -18,16 +19,19 @@ import com.ktogroup.ktoggle.commons.change.ChangeContext;
 import com.ktogroup.ktoggle.commons.change.ChangeContextProvider;
 import com.ktogroup.ktoggle.commons.change.ConfigurationChangedEvent;
 import com.ktogroup.ktoggle.commons.exception.ConflictException;
+import com.ktogroup.ktoggle.commons.exception.ForbiddenException;
 import com.ktogroup.ktoggle.commons.exception.MessageCode;
 import com.ktogroup.ktoggle.commons.exception.NotFoundException;
 import com.ktogroup.ktoggle.commons.exception.ValidationException;
 import com.ktogroup.ktoggle.commons.time.Ids;
+import com.ktogroup.ktoggle.project.ProjectService;
 import com.ktogroup.ktoggle.savedgroup.SavedGroupService.SavedGroupCommand;
 import com.ktogroup.ktoggle.targeting.ConditionValidator;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +50,9 @@ class SavedGroupServiceTest {
     private final ChangeContextProvider changeContextProvider = mock(ChangeContextProvider.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final ChangeContext context = new ChangeContext(Ids.newId(), "alice", null);
-    private final SavedGroupService service = new SavedGroupService(persistence, attributeService, new ConditionValidator(), auditService,
+    private final ProjectService projectService = mock(ProjectService.class);
+    private final SavedGroupService service = new SavedGroupService(persistence, attributeService, new ConditionValidator(), projectService,
+            auditService,
             changeContextProvider, events, Clock.fixed(NOW, ZoneOffset.UTC));
     private final SavedGroup existing = new SavedGroup("latam", "Latam", null, SavedGroupType.LIST, "country",
             List.of(JSON.textNode("BR")), null, NOW.minusSeconds(60), NOW.minusSeconds(60), 3L);
@@ -129,6 +135,20 @@ class SavedGroupServiceTest {
         assertThat(updated.createdAt()).isEqualTo(existing.createdAt());
         verify(auditService).record(context, AuditAction.UPDATE, EntityType.SAVED_GROUP, "latam", existing, updated);
         verify(events).publishEvent(new ConfigurationChangedEvent(context));
+    }
+
+    @Test
+    void updating_requires_edit_rights_on_every_project_whose_features_use_the_group() {
+        when(persistence.projectsUsing("latam")).thenReturn(Arrays.asList("open", null, "restricted"));
+        doThrow(new ForbiddenException(MessageCode.NOT_ALLOWED, "Only the editors of project 'restricted' can change its features"))
+                .when(projectService).requireCanEdit("restricted");
+
+        assertThatThrownBy(() -> service.update("latam", list("latam", "country", List.of(JSON.textNode("AR"))), 3L))
+                .isInstanceOf(ForbiddenException.class).hasMessageContaining("restricted");
+
+        verify(projectService).requireCanEdit("open");
+        verify(persistence, never()).save(any());
+        verify(events, never()).publishEvent(any(Object.class));
     }
 
     @Test

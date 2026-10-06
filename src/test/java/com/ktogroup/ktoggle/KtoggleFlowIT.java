@@ -316,6 +316,11 @@ class KtoggleFlowIT {
                                 "prerequisites", List.of(Map.of("featureKey", s.feature(), "condition", Map.of("value", true)))))), 400)
                 .getResponse().getContentAsString().transform(this::readTree);
         assertThat(cycle.path("message").asText()).contains("Circular prerequisite");
+
+        JsonNode archiving = fixtures.editMetadata(fixtures.draft(parent), Map.of("archived", true));
+        JsonNode blocked = admin.postJson("/admin/v1/drafts/" + archiving.path("id").asText() + "/publish", Map.of(), 400);
+        assertThat(blocked.path("message").asText()).as("the child would silently turn off").contains(s.feature());
+        assertThat(admin.getJson("/admin/v1/features/" + parent).path("archived").asBoolean()).isFalse();
     }
 
     @Test

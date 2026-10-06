@@ -65,6 +65,25 @@ class ProjectPermissionsIT {
     }
 
     @Test
+    void a_saved_group_used_by_a_restricted_project_is_changed_only_by_its_editors() throws Exception {
+        String attribute = new Fixtures(admin).attribute("tier", "STRING", false, false);
+        String group = unique("vips");
+        JsonNode created = admin.postJson("/admin/v1/saved-groups", Map.of("key", group, "name", "VIPs", "type", "LIST",
+                "attributeKey", attribute, "values", List.of("gold")), 201);
+        String feature = unique("lobby");
+        bob.postJson("/admin/v1/features", Map.of("key", feature, "valueType", "BOOLEAN", "defaultValue", false,
+                "projectKey", restricted), 201);
+        new Fixtures(bob).publishEnvironment(feature, environment, true, List.of(Map.of("type", "force", "enabled", true,
+                "savedGroups", List.of(group), "value", true)));
+        Map<String, Object> change = Map.of("name", "VIPs", "type", "LIST", "attributeKey", attribute,
+                "values", List.of("gold", "platinum"), "version", created.path("version").asLong());
+
+        JsonNode denied = eve.putJson("/admin/v1/saved-groups/" + group, change, 403);
+        assertThat(denied.path("message").asText()).contains(restricted);
+        bob.putJson("/admin/v1/saved-groups/" + group, change, 200);
+    }
+
+    @Test
     void moving_a_feature_into_a_restricted_project_needs_rights_there() throws Exception {
         String feature = new Fixtures(eve).feature("BOOLEAN", false);
         JsonNode draft = new Fixtures(eve).draft(feature);

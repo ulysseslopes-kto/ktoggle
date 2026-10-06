@@ -16,5 +16,11 @@ public interface SavedGroupPersistencePort {
     /** True if any feature rule (in any environment) references the group. */
     boolean isReferenced(String key);
 
+    /**
+     * Projects of the non-archived features with a rule referencing the group (null for features without a project):
+     * the features whose payload changes when the group changes.
+     */
+    List<String> projectsUsing(String key);
+
     void delete(String key);
 }

@@ -94,6 +94,20 @@ class DraftWorkflowIT {
     }
 
     @Test
+    void an_approver_who_edited_someone_elses_draft_cannot_approve_it() throws Exception {
+        Setup s = setup(true);
+        JsonNode draft = alice.postJson("/admin/v1/features/" + s.feature() + "/drafts", Map.of(), 201);
+        editEnvironment(carol, draft, s.environment(), true);
+        alice.postJson("/admin/v1/drafts/" + id(draft) + "/request-review", Map.of(), 200);
+
+        assertThat(carol.getJson("/admin/v1/drafts/" + id(draft)).path("permissions").path("review").asBoolean()).isFalse();
+        assertThat(carol.postJson("/admin/v1/drafts/" + id(draft) + "/approve", Map.of(), 403).path("message").asText())
+                .contains("Authors and editors");
+        assertThat(bob.getJson("/admin/v1/drafts/" + id(draft)).path("permissions").path("review").asBoolean()).isTrue();
+        bob.postJson("/admin/v1/drafts/" + id(draft) + "/approve", Map.of(), 200);
+    }
+
+    @Test
     void editing_an_approved_draft_requires_a_new_approval() throws Exception {
         Setup s = setup(true);
         JsonNode draft = alice.postJson("/admin/v1/features/" + s.feature() + "/drafts", Map.of(), 201);

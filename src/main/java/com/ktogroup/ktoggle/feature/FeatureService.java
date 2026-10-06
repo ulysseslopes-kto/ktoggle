@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -214,6 +215,9 @@ public class FeatureService {
     }
 
     private Feature commit(ChangeContext context, Feature current, Feature next, AuditAction action) {
+        if (current != null) {
+            requireDependentsStillServed(current, next);
+        }
         Instant now = Ids.now(clock);
         Feature saved = persistence.save(next.withRevision(next.revision() + 1).withUpdatedAt(now).withUpdatedBy(context.actor()));
         persistence.saveRevision(new FeatureRevision(saved.key(), saved.revision(), saved.snapshot(), context.changeId(),
@@ -222,6 +226,29 @@ public class FeatureService {
                 current == null ? null : current.snapshot(), saved.snapshot());
         events.publishEvent(new ConfigurationChangedEvent(context));
         return saved;
+    }
+
+    /**
+     * The other side of {@link PrerequisiteValidator}: a parent cannot be archived, or moved out of its dependents'
+     * project, while active features depend on it — SDKs would no longer get the parent and the dependents would
+     * silently evaluate to off.
+     */
+    private void requireDependentsStillServed(Feature current, Feature next) {
+        boolean archiving = next.archived() && !current.archived();
+        boolean moving = !next.archived() && !Objects.equals(current.projectKey(), next.projectKey());
+        if (!archiving && !moving) {
+            return;
+        }
+        List<String> blocking = persistence.findAllActive().stream()
+                .filter(feature -> !feature.key().equals(current.key()))
+                .filter(feature -> PrerequisiteValidator.parents(feature.snapshot()).contains(current.key()))
+                .filter(feature -> archiving || !Objects.equals(feature.projectKey(), next.projectKey()))
+                .map(Feature::key).sorted().toList();
+        if (!blocking.isEmpty()) {
+            throw ValidationException.of("'%s' is a prerequisite of %s; remove it from %s before %s".formatted(current.key(),
+                    String.join(", ", blocking), blocking.size() == 1 ? "that feature" : "those features",
+                    archiving ? "archiving it" : "moving it to another project"));
+        }
     }
 
     private Feature getForUpdate(String key, long expectedVersion) {

@@ -13,6 +13,7 @@ import com.ktogroup.ktoggle.commons.exception.ConflictException;
 import com.ktogroup.ktoggle.commons.exception.NotFoundException;
 import com.ktogroup.ktoggle.commons.exception.ValidationException;
 import com.ktogroup.ktoggle.commons.time.Ids;
+import com.ktogroup.ktoggle.project.ProjectService;
 import com.ktogroup.ktoggle.targeting.ConditionValidator;
 import java.time.Clock;
 import java.time.Instant;
@@ -36,6 +37,7 @@ public class SavedGroupService {
     private final SavedGroupPersistencePort persistence;
     private final AttributeService attributeService;
     private final ConditionValidator conditionValidator;
+    private final ProjectService projectService;
     private final AuditService auditService;
     private final ChangeContextProvider changeContextProvider;
     private final ApplicationEventPublisher events;
@@ -69,6 +71,10 @@ public class SavedGroupService {
         return saved;
     }
 
+    /**
+     * Applied live, as in GrowthBook (no draft): the change reaches every feature using the group at once, so the caller
+     * must be allowed to change the features of every project involved.
+     */
     @Transactional
     public SavedGroup update(String key, SavedGroupCommand command, long expectedVersion) {
         SavedGroup current = get(key);
@@ -79,6 +85,7 @@ public class SavedGroupService {
             throw ValidationException.of("The type of a saved group cannot change");
         }
         validate(command);
+        persistence.projectsUsing(key).forEach(projectService::requireCanEdit);
         SavedGroup saved = persistence.save(toDomain(command, current.createdAt(), Ids.now(clock), current.version()));
         ChangeContext context = changeContextProvider.current();
         auditService.record(context, AuditAction.UPDATE, EntityType.SAVED_GROUP, key, current, saved);

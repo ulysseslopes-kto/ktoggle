@@ -373,9 +373,10 @@ public class DraftService {
         if (currentUser.isApiToken()) {
             throw new ForbiddenException(MessageCode.NOT_ALLOWED, "API tokens cannot review drafts; reviews are made by people");
         }
-        if (!policy.canApprove(persistence.reviewSettings(), draft, currentUser.username(), currentUser.roles())) {
-            throw new ForbiddenException(MessageCode.NOT_ALLOWED, draft.createdBy().equals(currentUser.username())
-                    ? "Authors cannot review their own drafts" : "You are not an approver");
+        List<DraftEvent> events = persistence.events(draft.id());
+        if (!policy.canApprove(persistence.reviewSettings(), draft, events, currentUser.username(), currentUser.roles())) {
+            throw new ForbiddenException(MessageCode.NOT_ALLOWED, policy.authors(draft, events).contains(currentUser.username())
+                    ? "Authors and editors of a draft cannot review it" : "You are not an approver");
         }
         return draft;
     }
@@ -430,12 +431,13 @@ public class DraftService {
         List<String> blockers = policy.publishBlockers(draft, merge, reviewEnvironments);
         boolean canBypass = open && !reviewEnvironments.isEmpty() && draft.status() != DraftStatus.APPROVED
                 && merge.conflicts().isEmpty() && !merge.changes().isEmpty() && policy.canBypass(settings, roles);
+        List<DraftEvent> events = persistence.events(draft.id());
         return new DraftView(draft, live.revision(), merge.changes(), merge.conflicts(), reviewEnvironments,
-                persistence.events(draft.id()), new DraftView.Permissions(
+                events, new DraftView.Permissions(
                 canEdit,
                 canEdit && (draft.status() == DraftStatus.DRAFT || draft.status() == DraftStatus.CHANGES_REQUESTED),
                 open && draft.status() == DraftStatus.PENDING_REVIEW && !currentUser.isApiToken()
-                        && policy.canApprove(settings, draft, user, roles),
+                        && policy.canApprove(settings, draft, events, user, roles),
                 canEdit && blockers.isEmpty(),
                 canBypass,
                 open && (draft.createdBy().equals(user) || roles.contains(SecurityConfiguration.ADMIN))),

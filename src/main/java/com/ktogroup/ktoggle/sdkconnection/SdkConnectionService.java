@@ -96,6 +96,7 @@ public class SdkConnectionService {
     }
 
     /**
+     * @param projectKeys    null keeps the current projects; an empty list means every project
      * @param encryptPayload null keeps the current setting; turning it on creates a key when there is none
      * @param remoteEval     null keeps the current setting
      */
@@ -112,7 +113,8 @@ public class SdkConnectionService {
             throw ValidationException.of("Remote evaluation and payload encryption cannot be combined: "
                     + "with remote evaluation the rules never reach the SDK");
         }
-        SdkConnection saved = persistence.save(current.withName(name).withProjectKeys(validProjects(projectKeys))
+        SdkConnection saved = persistence.save(current.withName(name)
+                .withProjectKeys(projectKeys == null ? current.projectKeys() : validProjects(projectKeys))
                 .withEncryptPayload(encrypt).withRemoteEval(remote)
                 .withDecryptionKey(encrypt && current.decryptionKey() == null ? generateDecryptionKey() : current.decryptionKey())
                 .withUpdatedAt(Ids.now(clock)));

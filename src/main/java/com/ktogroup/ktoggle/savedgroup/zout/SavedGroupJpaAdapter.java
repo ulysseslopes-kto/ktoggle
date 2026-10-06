@@ -59,6 +59,11 @@ public class SavedGroupJpaAdapter implements SavedGroupPersistencePort {
     }
 
     @Override
+    public List<String> projectsUsing(String key) {
+        return repository.projectsUsing(key);
+    }
+
+    @Override
     public void delete(String key) {
         repository.findByKey(key).ifPresent(repository::delete);
     }

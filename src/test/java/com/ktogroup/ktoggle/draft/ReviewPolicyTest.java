@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.IntNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.ktogroup.ktoggle.draft.DraftMerger.MergeResult;
 import com.ktogroup.ktoggle.draft.DraftMerger.SectionChange;
 import com.ktogroup.ktoggle.environment.Environment;
@@ -15,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class ReviewPolicyTest {
@@ -58,12 +60,34 @@ class ReviewPolicyTest {
         ReviewSettings byRole = settings(List.of("ktoggle-approver"), List.of(), false);
         ReviewSettings byUser = settings(List.of(), List.of("bob"), false);
 
-        assertThat(policy.canApprove(byRole, draft, "bob", Set.of("ktoggle-approver"))).isTrue();
-        assertThat(policy.canApprove(byRole, draft, "bob", Set.of("ktoggle-editor"))).isFalse();
-        assertThat(policy.canApprove(byUser, draft, "bob", Set.of())).isTrue();
-        assertThat(policy.canApprove(byRole, draft, "alice", Set.of("ktoggle-approver"))).as("four-eyes").isFalse();
-        assertThat(policy.canApprove(settings(List.of("ktoggle-approver"), List.of(), true), draft, "alice", Set.of("ktoggle-approver")))
-                .as("self-approval enabled").isTrue();
+        assertThat(policy.canApprove(byRole, draft, List.of(), "bob", Set.of("ktoggle-approver"))).isTrue();
+        assertThat(policy.canApprove(byRole, draft, List.of(), "bob", Set.of("ktoggle-editor"))).isFalse();
+        assertThat(policy.canApprove(byUser, draft, List.of(), "bob", Set.of())).isTrue();
+        assertThat(policy.canApprove(byRole, draft, List.of(), "alice", Set.of("ktoggle-approver"))).as("four-eyes").isFalse();
+        assertThat(policy.canApprove(settings(List.of("ktoggle-approver"), List.of(), true), draft, List.of(), "alice",
+                Set.of("ktoggle-approver"))).as("self-approval enabled").isTrue();
+    }
+
+    @Test
+    void whoever_edited_the_draft_cannot_approve_it_either() {
+        ReviewSettings byRole = settings(List.of("ktoggle-approver"), List.of(), false);
+        List<DraftEvent> events = List.of(event(DraftEvent.Type.CREATED, "alice"), event(DraftEvent.Type.UPDATED, "bob"),
+                event(DraftEvent.Type.COMMENTED, "carol"), event(DraftEvent.Type.REVIEW_REQUESTED, "dave"));
+
+        assertThat(policy.canApprove(byRole, draft, events, "bob", Set.of("ktoggle-approver"))).as("edited it").isFalse();
+        assertThat(policy.canApprove(byRole, draft, events, "carol", Set.of("ktoggle-approver"))).as("only commented").isTrue();
+        assertThat(policy.canApprove(byRole, draft, events, "dave", Set.of("ktoggle-approver"))).as("only asked").isTrue();
+        assertThat(policy.canApprove(byRole, draft, List.of(event(DraftEvent.Type.REBASED, "erin")), "erin",
+                Set.of("ktoggle-approver"))).as("a rebase may change the content").isFalse();
+        assertThat(policy.canApprove(settings(List.of("ktoggle-approver"), List.of(), true), draft, events, "bob",
+                Set.of("ktoggle-approver"))).as("self-approval enabled").isTrue();
+    }
+
+    @Test
+    void moving_the_feature_to_another_project_affects_every_enabled_environment() {
+        MergeResult merge = merge(Map.of(), new SectionChange("projectKey", TextNode.valueOf("a"), TextNode.valueOf("b")));
+
+        assertThat(policy.affectedEnvironments(merge, Map.of("prd", on()))).containsExactly("prd");
     }
 
     @Test
@@ -106,5 +130,9 @@ class ReviewPolicyTest {
 
     private static ReviewSettings settings(List<String> roles, List<String> users, boolean self) {
         return new ReviewSettings(roles, users, self, true, true, null, null, 0L);
+    }
+
+    private static DraftEvent event(DraftEvent.Type type, String actor) {
+        return new DraftEvent(UUID.randomUUID(), null, type, actor, null, Instant.now());
     }
 }

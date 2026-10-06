@@ -211,6 +211,25 @@ class FeatureServiceTest {
     }
 
     @Test
+    void a_parent_with_active_dependents_cannot_be_archived_or_moved_away_from_them() {
+        existing(1, 0L);
+        Prerequisite onCheckout = new Prerequisite("checkout", JSON.objectNode().set("value", JSON.objectNode().put("$exists", true)));
+        Rule gated = new ForceRule("fr_g", null, true, null, null, JSON.booleanNode(true), null, List.of(onCheckout), null, null);
+        Feature featureLevel = feature(1, 0L, Map.of()).withKey("upsell").withPrerequisites(List.of(onCheckout));
+        Feature ruleLevel = feature(1, 0L, Map.of("prod", new EnvironmentSettings(true, List.of(gated)))).withKey("banner");
+        when(persistence.findAllActive()).thenReturn(List.of(featureLevel, ruleLevel));
+
+        assertThatThrownBy(() -> service.setArchived("checkout", true, 0L)).isInstanceOf(ValidationException.class)
+                .hasMessageContaining("banner, upsell").hasMessageContaining("archiving");
+        assertThatThrownBy(() -> service.updateMetadata("checkout", "payments", JSON.booleanNode(false), null, null, null, 0L))
+                .isInstanceOf(ValidationException.class).hasMessageContaining("another project");
+        verify(persistence, never()).save(any());
+
+        when(persistence.findAllActive()).thenReturn(List.of(feature(1, 0L, Map.of()).withKey("unrelated")));
+        assertThat(service.setArchived("checkout", true, 0L).archived()).isTrue();
+    }
+
+    @Test
     void unknown_features_and_revisions_are_not_found() {
         when(persistence.findByKey("ghost")).thenReturn(Optional.empty());
         existing(1, 0L);

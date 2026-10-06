@@ -106,6 +106,13 @@ class SdkConnectionServiceTest {
     }
 
     @Test
+    void an_update_without_project_keys_keeps_the_projects_and_an_empty_list_means_every_project() {
+        assertThat(service.update("sdk-abcdefgh12", "renamed", null, true, 5L).projectKeys())
+                .as("never silently widened to every project").containsExactly("a");
+        assertThat(service.update("sdk-abcdefgh12", "web", List.of(), 5L).projectKeys()).isEmpty();
+    }
+
+    @Test
     void updating_with_a_stale_version_or_unknown_key_fails() {
         assertThatThrownBy(() -> service.update("sdk-abcdefgh12", "x", null, 4L)).isInstanceOf(ConflictException.class);
         assertThatThrownBy(() -> service.update("sdk-missing000", "x", null, 0L)).isInstanceOf(NotFoundException.class);

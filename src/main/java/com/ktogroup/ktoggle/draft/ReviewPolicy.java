@@ -7,6 +7,7 @@ import com.ktogroup.ktoggle.environment.Environment;
 import com.ktogroup.ktoggle.feature.EnvironmentSettings;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,12 +20,19 @@ import org.springframework.stereotype.Component;
 @Component
 public class ReviewPolicy {
 
-    /** Sections that change what SDKs get in every environment where the feature is enabled. */
-    private static final Set<String> GLOBAL_SECTIONS = Set.of("defaultValue", "archived", "prerequisites");
+    /**
+     * Sections that change what SDKs get in every environment where the feature is enabled (moving the feature to
+     * another project adds it to, or removes it from, the connections scoped by project).
+     */
+    private static final Set<String> GLOBAL_SECTIONS = Set.of("defaultValue", "archived", "prerequisites", "projectKey");
+    /** Events that change the proposed content (a rebase may take the draft's side of a conflict). */
+    private static final Set<DraftEvent.Type> AUTHORING = EnumSet.of(DraftEvent.Type.CREATED, DraftEvent.Type.UPDATED,
+            DraftEvent.Type.REBASED);
 
     /**
      * Environments whose SDK payload would change: environments with changed settings, plus — for changes to the
-     * default value, prerequisites or archiving — every environment where the feature is enabled (live or after publishing).
+     * default value, prerequisites, project or archiving — every environment where the feature is enabled (live or
+     * after publishing).
      */
     public Set<String> affectedEnvironments(MergeResult merge, Map<String, EnvironmentSettings> live) {
         Set<String> affected = new TreeSet<>();
@@ -56,10 +64,23 @@ public class ReviewPolicy {
         return affected.stream().filter(env -> byKey.containsKey(env) && byKey.get(env).requiresReview()).toList();
     }
 
-    public boolean canApprove(ReviewSettings settings, FeatureDraft draft, String username, Set<String> roles) {
+    /**
+     * Four-eyes: unless self-approval is allowed, nobody who wrote any part of the draft (its author or anyone who
+     * edited it) may approve it.
+     */
+    public boolean canApprove(ReviewSettings settings, FeatureDraft draft, List<DraftEvent> events, String username,
+                              Set<String> roles) {
         boolean eligible = settings.approverUsers().contains(username)
                 || settings.approverRoles().stream().anyMatch(roles::contains);
-        return eligible && (settings.allowSelfApproval() || !username.equals(draft.createdBy()));
+        return eligible && (settings.allowSelfApproval() || !authors(draft, events).contains(username));
+    }
+
+    /** The draft's author and everyone who changed its content. */
+    public Set<String> authors(FeatureDraft draft, List<DraftEvent> events) {
+        Set<String> authors = new TreeSet<>();
+        authors.add(draft.createdBy());
+        events.stream().filter(e -> AUTHORING.contains(e.type())).map(DraftEvent::actor).forEach(authors::add);
+        return authors;
     }
 
     public boolean canBypass(ReviewSettings settings, Set<String> roles) {
